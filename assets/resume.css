@@ -1,0 +1,115 @@
+/* ============================================================
+   简历版面样式
+   与 resume-tailor skill 的 templates/resume.html.j2 同源。
+   改这里的时候，那边也要同步改，否则网页微调出来的版面
+   会和 skill 直接生成的 PDF 对不上。
+   ============================================================ */
+
+:root{
+  /* ---- 调参区：编辑器的滑块改的就是这几个变量 ---- */
+  --base:           11.5pt;   /* 正文字号 */
+  --leading:        1.06;     /* 行高倍数 */
+  --sec-gap-above:  6pt;      /* 板块标题上方留白 */
+  --title-line-gap: 3pt;      /* 标题到横线 */
+  --sec-gap-below:  3.5pt;    /* 横线到正文 */
+  --item-gap:       2pt;      /* 要点之间 */
+  --entry-gap:      5.5pt;    /* 条目之间 */
+  --photo-w:        2.85cm;   /* 照片宽度 */
+
+  --rule-thick:  1.4pt;
+  --edu-col-w:   3.8cm;
+
+  --accent:      rgb(28,90,180);
+  --accent-dark: rgb(18,60,130);
+  --link:        rgb(40,110,210);
+  --gray:        rgb(90,90,90);
+
+  /* A4 版心：21cm 宽，上下留 0.8cm、左右留 1cm */
+  --page-w:      21cm;
+  --page-h:      29.7cm;
+  --page-mt:     0.8cm;
+  --page-mx:     1cm;
+}
+
+/* ---------- 纸张 ---------- */
+.paper{
+  width: var(--page-w);
+  min-height: var(--page-h);
+  padding: var(--page-mt) var(--page-mx);
+  background: #fff;
+  margin: 0 auto;
+  box-shadow: 0 2px 18px rgba(0,0,0,.18);
+  font-family: "Noto Sans SC","Noto Sans CJK SC","Microsoft YaHei","微软雅黑",
+               "PingFang SC","Hiragino Sans GB",sans-serif;
+  font-size: var(--base);
+  line-height: var(--leading);
+  color: #000;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.paper *{ margin:0; padding:0; box-sizing:border-box; }
+.paper a{ color:var(--link); text-decoration:none; }
+.paper .small{ font-size:0.9em; }
+.paper .gray{ color:var(--gray); }
+.paper .b{ font-weight:700; }
+
+/* ---------- 顶部信息区 ---------- */
+.header{ display:flex; align-items:center; gap:0.55cm; }
+.header .photo{ width:var(--photo-w); flex:0 0 var(--photo-w); }
+.header .photo img{ width:100%; display:block; }
+.header .info{ flex:1 1 auto; min-width:0; }
+.name{ font-size:1.73em; font-weight:700; line-height:1.15; }
+.idline{ margin-top:3pt; }
+.idline:first-of-type{ margin-top:5pt; }
+.idline .fld{ display:inline-block; white-space:nowrap; }
+.idline .lab{ color:var(--accent); font-weight:700; }
+.idline .sep{ display:inline-block; width:1em; }
+
+/* ---------- 板块标题 ---------- */
+.sec{ margin-top:var(--sec-gap-above); }
+.sec-title{ display:flex; align-items:center; gap:0.35em;
+            color:var(--accent-dark); font-weight:700; }
+.sec-title svg{ height:1.05em; width:auto; overflow:visible; flex:0 0 auto; }
+.sec-rule{ margin-top:var(--title-line-gap); height:var(--rule-thick);
+           background:var(--accent); margin-bottom:var(--sec-gap-below); }
+
+/* ---------- 教育行 / 校园行：三栏，中列居中 ---------- */
+.row3{ display:grid; grid-template-columns:1fr auto 1fr;
+       align-items:baseline; column-gap:0.6em; margin-top:1.5pt; }
+.row3 .l{ justify-self:start; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row3 .c{ justify-self:center; white-space:nowrap; }
+.row3 .r{ justify-self:end;  white-space:nowrap; }
+.row3.edu .c{ width:var(--edu-col-w); text-align:left; }
+
+/* ---------- 条目标题行 ---------- */
+.entry{ margin-top:var(--entry-gap); }
+.entry:first-of-type{ margin-top:1.5pt; }
+.entry-head{ display:flex; align-items:baseline; gap:0.5em; }
+.entry-head .org{ font-weight:700; }
+.entry-head .role{ color:var(--accent); }
+.entry-head .date{ margin-left:auto; white-space:nowrap; }
+
+/* ---------- 带标签要点 ---------- */
+.bullet{ padding-left:1.42em; text-indent:-1.42em; margin-top:var(--item-gap);
+         text-align:justify; }
+.bullet .sq{ display:inline-block; width:0.30em; height:0.30em;
+             background:var(--accent); vertical-align:0.16em; margin-right:0.42em; }
+.bullet .lab{ color:var(--accent-dark); font-weight:700; }
+
+/* ---------- 技能行 / 备注行 ---------- */
+.skill{ display:flex; align-items:baseline; margin-top:1pt; }
+.skill .lab{ font-weight:700; white-space:nowrap; }
+.skill .val{ flex:1 1 auto; min-width:0; text-align:justify; }
+.note{ margin-top:1pt; }
+.note .lab{ font-weight:700; }
+
+/* ============================================================
+   打印：纸张的屏幕修饰全部去掉，交给 @page 控制真实页边距
+   ============================================================ */
+@page{ size:A4; margin:0.8cm 1cm; }
+
+@media print{
+  .paper{
+    width:auto; min-height:0; padding:0; margin:0;
+    box-shadow:none; background:transparent;
+  }
+}

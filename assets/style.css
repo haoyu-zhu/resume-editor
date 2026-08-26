@@ -1,0 +1,139 @@
+/* ============================================================
+   编辑器界面样式。
+   凡是这里定义的东西，打印时必须全部消失 —— 纸上只能有简历本身。
+   ============================================================ */
+
+*{ box-sizing:border-box; }
+/* .empty / .stage 有自己的 display，会盖过 hidden 属性的 UA 样式 */
+[hidden]{ display:none !important; }
+body{
+  margin:0; background:#eceff3; color:#1b2430;
+  font-family:"Microsoft YaHei","微软雅黑","PingFang SC","Hiragino Sans GB",
+              -apple-system,"Segoe UI",sans-serif;
+  font-size:14px;
+}
+
+/* 1cm 参照物，用于 px 换算 */
+#probe{ position:absolute; visibility:hidden; width:1cm; height:1px; top:0; left:0; }
+
+.app{ display:flex; min-height:100vh; align-items:flex-start; }
+
+/* ---------------- 侧栏 ---------------- */
+.sidebar{
+  width:300px; flex:0 0 300px; background:#fff; border-right:1px solid #dfe3ea;
+  padding:18px 16px 40px; position:sticky; top:0; max-height:100vh; overflow-y:auto;
+}
+.sidebar h1{ font-size:18px; margin:0 0 8px; }
+.lede{ font-size:12.5px; line-height:1.6; color:#5b6675; margin:0 0 14px; }
+.lede code{ background:#f1f3f7; padding:1px 4px; border-radius:3px; }
+.notice{
+  background:#eaf3ff; border:1px solid #c7ddfa; color:#1c5ab4;
+  padding:7px 10px; border-radius:6px; font-size:12.5px; margin-bottom:12px;
+}
+.panel{ border-top:1px solid #eceff3; padding-top:14px; margin-top:14px; }
+.panel:first-of-type{ border-top:0; margin-top:0; padding-top:0; }
+.panel h2{ font-size:13px; margin:0 0 10px; color:#39424f; letter-spacing:.02em; }
+.hint{ font-size:11.5px; line-height:1.55; color:#7b8595; margin:8px 0 0; }
+
+.btn{
+  display:inline-block; padding:6px 11px; border:1px solid #ccd3dd; background:#fff;
+  border-radius:6px; font-size:12.5px; cursor:pointer; color:#2b3542;
+  font-family:inherit; text-align:center;
+}
+.btn:hover{ border-color:#8fa8c9; background:#f7faff; }
+.btn:disabled{ opacity:.45; cursor:default; background:#fff; border-color:#ccd3dd; }
+.btn.primary{ background:rgb(28,90,180); border-color:rgb(28,90,180); color:#fff; }
+.btn.primary:hover{ background:rgb(22,74,152); }
+.btn.wide{ display:block; width:100%; margin-bottom:7px; }
+.btn-row{ display:flex; gap:7px; margin-top:7px; flex-wrap:wrap; }
+.btn-row.end{ justify-content:flex-end; margin-top:14px; }
+.btn-row .btn{ flex:1 1 auto; }
+
+.row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12.5px; }
+.row > span{ flex:0 0 76px; color:#5b6675; }
+.row select{
+  flex:1 1 auto; padding:5px 6px; border:1px solid #ccd3dd; border-radius:5px;
+  font-family:inherit; font-size:12.5px; background:#fff;
+}
+.row.slider input[type=range]{ flex:1 1 auto; min-width:0; accent-color:rgb(28,90,180); }
+.row.slider b{ flex:0 0 38px; text-align:right; font-weight:600; color:#39424f;
+               font-variant-numeric:tabular-nums; }
+
+/* ---------------- 占用指示 ---------------- */
+.fill-track{ height:7px; background:#e6eaf0; border-radius:4px; overflow:hidden; }
+#fill-bar{ height:100%; width:0; background:rgb(28,90,180); transition:width .15s; }
+#fill-text{ font-size:12.5px; margin-top:6px; font-weight:600; color:rgb(28,90,180); }
+#fill.over #fill-bar{ background:#d64545; }
+#fill.over #fill-text{ color:#d64545; }
+#fill.thin #fill-bar{ background:#e0a33a; }
+#fill.thin #fill-text{ color:#b57d1c; }
+
+/* ---------------- 空状态 / 拖放区 ---------------- */
+.empty{ flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+        min-height:100vh; padding:40px; }
+.empty-inner{
+  border:2px dashed #c3ccd9; border-radius:14px; padding:56px 64px;
+  text-align:center; color:#6c7686; background:#f6f8fb;
+}
+.empty.hot .empty-inner{ border-color:rgb(28,90,180); background:#eef5ff; }
+.empty-icon{ font-size:40px; }
+.empty h2{ font-size:17px; margin:12px 0 8px; color:#39424f; }
+.empty p{ font-size:13px; line-height:1.7; margin:0; }
+
+/* ---------------- 纸张舞台 ---------------- */
+.stage{ flex:1 1 auto; padding:24px; display:flex; justify-content:center;
+        align-items:flex-start; overflow:auto; min-height:100vh; }
+.paper{ transform-origin:top center; }
+
+/* ---------------- 可编辑节点 ---------------- */
+.ed{ outline:none; border-radius:2px; }
+.ed:hover{ background:rgba(28,90,180,.07); box-shadow:0 0 0 2px rgba(28,90,180,.07); }
+.ed:focus{ background:rgba(255,214,0,.16); box-shadow:0 0 0 2px rgba(255,214,0,.16); }
+.ed:empty::after{ content:"（空）"; color:#b8c0cc; }
+
+/* 行级操作按钮：绝对定位，不参与排版；平时透明，鼠标移上去才出现 */
+.paper .bullet, .paper .entry, .paper .sec-title, .paper .row3,
+.paper .skill, .paper .note, .paper .fld{ position:relative; }
+
+.ctl{
+  position:absolute; left:100%; top:0; margin-left:3px;
+  display:flex; gap:2px; opacity:0; pointer-events:none;
+  transition:opacity .1s; z-index:5; white-space:nowrap;
+}
+.bullet:hover > .ctl, .entry:hover > .entry-head > .ctl, .sec-title:hover > .ctl,
+.row3:hover > .ctl, .skill:hover > .ctl, .note:hover > .ctl, .fld:hover > .ctl{
+  opacity:1; pointer-events:auto;
+}
+.ctl-btn{
+  width:18px; height:18px; line-height:1; padding:0; cursor:pointer;
+  border:1px solid #d7dde6; background:#fff; border-radius:4px;
+  font-size:10px; color:#7b8595; font-family:inherit;
+}
+.ctl-btn:hover{ background:#fff0f0; border-color:#e3a0a0; color:#c23b3b; }
+.ctl-link:hover{ background:#eef5ff; border-color:#9dbde8; color:rgb(28,90,180); }
+
+/* 顶部信息区的字段挨得紧，按钮盖在后面一点，加个白底免得糊在一起 */
+.fld .ctl{ background:#fff; box-shadow:0 0 0 3px #fff; }
+
+/* ---------------- 打印对话框 ---------------- */
+dialog{
+  border:0; border-radius:12px; padding:24px 26px; max-width:520px;
+  box-shadow:0 18px 60px rgba(0,0,0,.28); color:#1b2430;
+}
+dialog::backdrop{ background:rgba(20,26,36,.45); }
+dialog h2{ font-size:16px; margin:0 0 14px; }
+dialog ol{ margin:0; padding-left:20px; font-size:13px; line-height:1.75; }
+dialog li{ margin-bottom:9px; }
+
+/* ============================================================
+   打印：只留纸
+   ============================================================ */
+@media print{
+  body{ background:#fff; }
+  .sidebar, .empty, #probe, .ctl, dialog{ display:none !important; }
+  .app{ display:block; }
+  .stage{ padding:0; margin:0; display:block; min-height:0; overflow:visible; }
+  .paper{ transform:none !important; }
+  .ed{ background:none !important; box-shadow:none !important; }
+  .ed:empty::after{ content:""; }
+}

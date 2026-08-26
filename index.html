@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>简历微调器</title>
+<link rel="stylesheet" href="assets/resume.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- 用来把 cm 换算成 px，别删 -->
+<div id="probe"></div>
+
+<div class="app">
+
+  <!-- ====================== 侧栏 ====================== -->
+  <aside class="sidebar">
+    <h1>简历微调器</h1>
+    <p class="lede">导入 <code>resume.json</code>，直接在纸面上改字、调版面、删条目，然后打印成 PDF。<b>所有数据只留在你自己的浏览器里，不上传。</b></p>
+
+    <div id="restored" class="notice" hidden>已恢复上次没改完的内容。</div>
+
+    <section class="panel">
+      <h2>简历文件</h2>
+      <label class="btn primary" for="file">选择 resume.json</label>
+      <input type="file" id="file" accept=".json,application/json" hidden>
+      <div class="btn-row">
+        <button class="btn" id="btn-paste">粘贴 JSON</button>
+        <button class="btn" id="btn-sample">看示例</button>
+      </div>
+    </section>
+
+    <div id="editor-tools" hidden>
+
+      <section class="panel">
+        <h2>版面占用</h2>
+        <div id="fill">
+          <div class="fill-track"><div id="fill-bar"></div></div>
+          <div id="fill-text">—</div>
+        </div>
+        <p class="hint" id="fill-hint"></p>
+      </section>
+
+      <section class="panel">
+        <h2>版面松紧</h2>
+        <label class="row">
+          <span>预设档位</span>
+          <select id="ladder">
+            <option value="-1">自定义</option>
+            <option value="0">13.5pt 最松</option>
+            <option value="1">12.75pt</option>
+            <option value="2">12pt</option>
+            <option value="3">11.5pt</option>
+            <option value="4">11pt</option>
+            <option value="5">10.5pt</option>
+            <option value="6">10pt</option>
+            <option value="7">9.5pt</option>
+            <option value="8">9pt</option>
+            <option value="9">8.5pt 最紧</option>
+          </select>
+        </label>
+
+        <label class="row slider"><span>字号</span>
+          <input type="range" id="sl-base" min="8" max="15" step="0.25"><b id="val-base"></b></label>
+        <label class="row slider"><span>行距</span>
+          <input type="range" id="sl-leading" min="0.9" max="1.4" step="0.01"><b id="val-leading"></b></label>
+        <label class="row slider"><span>要点间距</span>
+          <input type="range" id="sl-item" min="0" max="8" step="0.1"><b id="val-item"></b></label>
+        <label class="row slider"><span>条目间距</span>
+          <input type="range" id="sl-entry" min="0" max="14" step="0.5"><b id="val-entry"></b></label>
+        <label class="row slider"><span>板块间距</span>
+          <input type="range" id="sl-secAbove" min="0" max="14" step="0.5"><b id="val-secAbove"></b></label>
+        <label class="row slider"><span>标题到横线</span>
+          <input type="range" id="sl-titleGap" min="0" max="8" step="0.5"><b id="val-titleGap"></b></label>
+        <label class="row slider"><span>横线到正文</span>
+          <input type="range" id="sl-secBelow" min="0" max="10" step="0.5"><b id="val-secBelow"></b></label>
+        <label class="row slider"><span>照片宽度</span>
+          <input type="range" id="sl-photo" min="2" max="4" step="0.05"><b id="val-photo"></b></label>
+      </section>
+
+      <section class="panel">
+        <h2>照片</h2>
+        <div class="btn-row">
+          <label class="btn" for="photo-file">换一张</label>
+          <input type="file" id="photo-file" accept="image/*" hidden>
+          <button class="btn" id="btn-photo-del">不要照片</button>
+        </div>
+        <p class="hint">会自动缩到 420px 宽，不用先自己压缩。</p>
+      </section>
+
+      <section class="panel">
+        <h2>反悔</h2>
+        <div class="btn-row">
+          <button class="btn" id="btn-undo" disabled>撤销删除</button>
+          <button class="btn" id="btn-revert">还原全部</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>导出</h2>
+        <button class="btn primary wide" id="btn-print">打印 / 存成 PDF</button>
+        <button class="btn wide" id="btn-json">下载改好的 JSON</button>
+        <p class="hint">下载的 JSON 可以留着下次接着改，也可以发回给帮你改简历的人。</p>
+      </section>
+
+      <section class="panel">
+        <h2>显示比例</h2>
+        <label class="row slider"><span>缩放</span>
+          <input type="range" id="zoom" min="40" max="120" step="5"><b id="zoom-val"></b></label>
+        <p class="hint">只影响屏幕上看着大小，不影响打印。</p>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- ====================== 主区 ====================== -->
+  <div id="empty" class="empty">
+    <div class="empty-inner">
+      <div class="empty-icon">📄</div>
+      <h2>把 resume.json 拖进来</h2>
+      <p>或者用左边的「选择 resume.json」。<br>没有文件的话，可以先「看示例」。</p>
+    </div>
+  </div>
+
+  <main id="stage" class="stage" hidden>
+    <div class="paper"><div id="doc"></div></div>
+  </main>
+
+</div>
+
+<!-- ====================== 打印提示 ====================== -->
+<dialog id="print-tips">
+  <h2>打印前，请在打印对话框里确认三件事</h2>
+  <ol>
+    <li><b>页眉和页脚：关掉。</b>不关的话纸上会印出网址和日期。<br>
+        （Chrome：展开「更多设置」→ 取消勾选「页眉和页脚」）</li>
+    <li><b>背景图形：勾上。</b>不勾的话蓝色横线和图标会全部消失。</li>
+    <li><b>纸张 A4、边距选「默认」。</b>页边距已经写在网页里了，不用自己调。</li>
+  </ol>
+  <p class="hint">目标是「另存为 PDF」。如果版面和预览不一样，回来检查上面三项。</p>
+  <div class="btn-row end">
+    <button class="btn" onclick="document.getElementById('print-tips').close()">取消</button>
+    <button class="btn primary" id="btn-print-go">好，去打印</button>
+  </div>
+</dialog>
+
+<script src="assets/sample.js"></script>
+<script src="assets/render.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
