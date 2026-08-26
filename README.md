@@ -88,7 +88,8 @@ git push -u origin main
   - `skills` — 任何「标签：内容」的板块，技能、自我总结都用它（`lines[]`）
   - `entries` — 实习、工作、项目、科研、竞赛（`items[]`，每项带 `bullets[]`）
   - `campus` — 一行一条的校园经历（`items[]`）
-- `sections[].icon`：`edu` `star` `job` `folder` `research` `flag` `note`
+- `sections[].icon`：`edu` `star` `job` `folder` `research` `flag` `note` `cert` `globe` `trophy`
+  （学位帽 / 星 / 公文包 / 文件夹 / 放大镜 / 旗 / 便签 / 证书 / 地球 / 奖杯）
 
 完整字段说明见 `resume-tailor` 的 `references/schema.md`。
 
@@ -101,7 +102,7 @@ index.html          页面结构
 assets/resume.css   简历版面样式（与 resume-tailor 的模板同源，改这里那边也要改）
 assets/style.css    编辑器界面样式（打印时全部隐藏）
 assets/render.js    JSON -> DOM
-assets/app.js       编辑逻辑：改字回写、删除、撤销、版面变量、导出
+assets/app.js       编辑逻辑：改字回写、增删、移动、撤销、版面变量、导出
 assets/sample.js    示例简历（虚构数据）
 ```
 
