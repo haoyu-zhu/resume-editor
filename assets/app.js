@@ -29,6 +29,35 @@ const VARMAP = {  // 滑块 id -> [CSS 变量, 单位]
   photo:    ["--photo-w", "cm"],
 };
 
+/* ---- 新增条目的模板，以及新增后光标该落在哪个字段 ---- */
+const ADD_TEMPLATES = {
+  eduItem:    () => ({ date: "2021.9 - 2025.7", org: "学校名称", tag: "985", major: "专业", degree: "本科" }),
+  note:       () => ({ label: "备注", value: "内容" }),
+  skillLine:  () => ({ label: "标签", value: "内容" }),
+  campusItem: () => ({ date: "2024.9 - 2025.6", org: "组织名称", role: "角色" }),
+  entry:      () => ({ date: "2026.1 - 2026.6", org: "公司 / 项目名称", role: "角色",
+                       bullets: [{ label: "标签", text: "内容" }] }),
+  bullet:     () => ({ label: "标签", text: "内容" }),
+};
+const FOCUS_FIELD = { eduItem: "org", note: "label", skillLine: "label",
+                      campusItem: "org", entry: "org", bullet: "label" };
+
+/* ---- 可新增的板块预设 ---- */
+const SECTION_PRESETS = {
+  cert:      { title: "证书",     type: "skills",  icon: "cert",
+               lines: [{ label: "证书", value: "例：CPA 已通过 4 门；教师资格证（高中数学）" }] },
+  lang:      { title: "语言能力", type: "skills",  icon: "globe",
+               lines: [{ label: "语言", value: "例：英语 CET-6 580；雅思 6.5" }] },
+  award:     { title: "荣誉奖项", type: "skills",  icon: "trophy",
+               lines: [{ label: "奖项", value: "例：2024-2025 学年国家奖学金" }] },
+  portfolio: { title: "作品集",   type: "skills",  icon: "folder",
+               lines: [{ label: "作品集", value: "把链接填在这里" }] },
+  work:      { title: "工作经历", type: "entries", icon: "job" },
+  contest:   { title: "竞赛经历", type: "entries", icon: "trophy" },
+  paper:     { title: "论文专利", type: "entries", icon: "research" },
+  research:  { title: "科研经历", type: "entries", icon: "research" },
+};
+
 const LS_DATA = "resume-editor:data";
 const LS_VARS = "resume-editor:vars";
 
@@ -74,8 +103,75 @@ function pathDelete(obj, path) {
 /* ============================== 渲染 ============================== */
 function paint() {
   renderResume(state.data, $("#doc"));
+  $("#btn-undo").disabled = !state.undo.length;
   measure();
   persist();
+}
+
+/** 结构性改动前先存档，撤销栈最多留 30 步 */
+function snapshot() {
+  state.undo.push(clone(state.data));
+  if (state.undo.length > 30) state.undo.shift();
+}
+
+/** 重渲染之后把光标放到新出现的字段上，并滚到可见处 */
+function focusPath(path) {
+  const el = $(`#doc [data-path="${CSS.escape(path)}"]`);
+  if (!el) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  el.focus();
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);          // 选中占位文字，直接打字就覆盖掉
+}
+
+/* ---------------- 增 / 移 ---------------- */
+function addRow(arrPath, kind) {
+  if (!ADD_TEMPLATES[kind]) return;
+  snapshot();
+  let arr = pathGet(state.data, arrPath);
+  if (!Array.isArray(arr)) { pathSet(state.data, arrPath, []); arr = pathGet(state.data, arrPath); }
+  arr.push(ADD_TEMPLATES[kind]());
+  paint();
+  focusPath(`${arrPath}.${arr.length - 1}.${FOCUS_FIELD[kind]}`);
+}
+
+function addSection(key) {
+  let preset;
+  if (key === "custom") {
+    const title = prompt("新板块的标题：", "板块名称");
+    if (!title) return;
+    preset = { title, type: "skills", icon: "note", lines: [{ label: "标签", value: "内容" }] };
+  } else {
+    preset = clone(SECTION_PRESETS[key]);
+    if (!preset) return;
+  }
+  if (preset.type === "entries" && !preset.items) preset.items = [ADD_TEMPLATES.entry()];
+  if (preset.type === "skills" && !preset.lines) preset.lines = [ADD_TEMPLATES.skillLine()];
+
+  snapshot();
+  const secs = state.data.sections;
+  // 「自我总结」习惯上放最后，新板块插到它前面去
+  let at = secs.length;
+  const last = secs[secs.length - 1];
+  if (last && /自我总结|自我评价/.test(last.title || "")) at = secs.length - 1;
+  secs.splice(at, 0, preset);
+  paint();
+  focusPath(`sections.${at}.title`);
+}
+
+function moveItem(path, dir) {
+  const ks = path.split(".");
+  const idx = Number(ks.pop());
+  const arr = ks.reduce((o, k) => (o == null ? o : o[k]), state.data);
+  if (!Array.isArray(arr)) return;
+  const to = idx + dir;
+  if (to < 0 || to >= arr.length) return;
+  snapshot();
+  arr.splice(to, 0, arr.splice(idx, 1)[0]);
+  paint();
 }
 
 function applyVars() {
@@ -236,13 +332,17 @@ function bind() {
   $("#doc").addEventListener("click", (e) => {
     const del = e.target.closest(".ctl-del");
     if (del) {
-      state.undo.push(clone(state.data));
-      if (state.undo.length > 30) state.undo.shift();
+      snapshot();
       pathDelete(state.data, del.dataset.del);
       paint();
-      $("#btn-undo").disabled = false;
       return;
     }
+    const add = e.target.closest(".ctl-add");
+    if (add) { addRow(add.dataset.add, add.dataset.kind); return; }
+
+    const mv = e.target.closest(".ctl-move");
+    if (mv) { moveItem(mv.dataset.move, Number(mv.dataset.dir)); return; }
+
     const link = e.target.closest(".ctl-link");
     if (link) {
       const cur = pathGet(state.data, link.dataset.url) || "";
@@ -254,14 +354,19 @@ function bind() {
     if (!state.undo.length) return;
     state.data = state.undo.pop();
     paint();
-    $("#btn-undo").disabled = !state.undo.length;
   });
   $("#btn-revert").addEventListener("click", () => {
     if (!state.original) return;
     if (!confirm("放弃所有修改，回到刚导入时的样子？")) return;
-    state.undo.push(clone(state.data));
+    snapshot();
     state.data = clone(state.original);
     paint();
+  });
+
+  // ---- 添加板块 ----
+  $("#btn-add-sec").addEventListener("click", () => {
+    if (!state.data) return;
+    addSection($("#new-sec").value);
   });
 
   // ---- 版面 ----

@@ -93,7 +93,7 @@ body{
 
 /* 行级操作按钮：绝对定位，不参与排版；平时透明，鼠标移上去才出现 */
 .paper .bullet, .paper .entry, .paper .sec-title, .paper .row3,
-.paper .skill, .paper .note, .paper .fld{ position:relative; }
+.paper .skill, .paper .note, .paper .fld, .paper .entry-head{ position:relative; }
 
 .ctl{
   position:absolute; left:100%; top:0; margin-left:3px;
@@ -110,7 +110,17 @@ body{
   font-size:10px; color:#7b8595; font-family:inherit;
 }
 .ctl-btn:hover{ background:#fff0f0; border-color:#e3a0a0; color:#c23b3b; }
-.ctl-link:hover{ background:#eef5ff; border-color:#9dbde8; color:rgb(28,90,180); }
+.ctl-link:hover, .ctl-move:hover{ background:#eef5ff; border-color:#9dbde8; color:rgb(28,90,180); }
+
+/* 「＋」放在左侧页边距，和右边的删除/移动分开，免得挤在一起认错 */
+.addbar{
+  position:absolute; right:100%; top:0; margin-right:3px;
+  display:flex; gap:2px; opacity:0; pointer-events:none;
+  transition:opacity .1s; z-index:5; white-space:nowrap;
+}
+.sec-title:hover > .addbar, .entry-head:hover > .addbar{ opacity:1; pointer-events:auto; }
+.ctl-add{ width:auto; padding:0 4px; font-size:10px; }
+.ctl-add:hover{ background:#eefaf0; border-color:#8fc79c; color:#1e7a37; }
 
 /* 顶部信息区的字段挨得紧，按钮盖在后面一点，加个白底免得糊在一起 */
 .fld .ctl{ background:#fff; box-shadow:0 0 0 3px #fff; }
@@ -130,7 +140,7 @@ dialog li{ margin-bottom:9px; }
    ============================================================ */
 @media print{
   body{ background:#fff; }
-  .sidebar, .empty, #probe, .ctl, dialog{ display:none !important; }
+  .sidebar, .empty, #probe, .ctl, .addbar, dialog{ display:none !important; }
   .app{ display:block; }
   .stage{ padding:0; margin:0; display:block; min-height:0; overflow:visible; }
   .paper{ transform:none !important; }

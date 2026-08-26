@@ -16,6 +16,9 @@ const ICONS = {
   folder: '<svg viewBox="0 0 100 70"><polygon points="0,35 0,22 38,22 46,35" fill="rgb(28,90,180)"/><rect x="0" y="33" width="100" height="35" fill="rgb(28,90,180)"/></svg>',
   flag: '<svg viewBox="0 0 78 76" fill="none"><line x1="2.5" y1="4" x2="2.5" y2="73" stroke="rgb(28,90,180)" stroke-width="5"/><polygon points="2.5,6 75,18 2.5,34" fill="rgb(28,90,180)"/></svg>',
   note: '<svg viewBox="0 0 100 72" fill="none" stroke="rgb(28,90,180)" stroke-width="5"><rect x="2.5" y="14.5" width="95" height="54" rx="4"/><line x1="15" y1="32" x2="85" y2="32"/><line x1="15" y1="52" x2="65" y2="52"/></svg>',
+  cert: '<svg viewBox="0 0 100 76" fill="none" stroke="rgb(28,90,180)" stroke-width="5"><rect x="2.5" y="5" width="80" height="56" rx="3"/><line x1="17" y1="24" x2="60" y2="24"/><line x1="17" y1="40" x2="47" y2="40"/><circle cx="76" cy="55" r="14" fill="rgb(28,90,180)" stroke="none"/></svg>',
+  globe: '<svg viewBox="0 0 100 92" fill="none" stroke="rgb(28,90,180)" stroke-width="5"><circle cx="47" cy="45" r="42"/><ellipse cx="47" cy="45" rx="18" ry="42"/><line x1="5" y1="45" x2="89" y2="45"/></svg>',
+  trophy: '<svg viewBox="0 0 100 86" fill="none" stroke="rgb(28,90,180)" stroke-width="5"><path d="M28 4 h44 v26 a22 22 0 0 1 -44 0 z" fill="rgb(28,90,180)" stroke="none"/><path d="M28 10 h-15 v9 a15 15 0 0 0 15 15"/><path d="M72 10 h15 v9 a15 15 0 0 1 -15 15"/><line x1="50" y1="52" x2="50" y2="66"/><rect x="29" y="66" width="42" height="10" fill="rgb(28,90,180)" stroke="none"/></svg>',
   _default: '<svg viewBox="0 0 100 95"><circle cx="50" cy="48" r="30" fill="rgb(28,90,180)"/></svg>',
 };
 
@@ -32,14 +35,43 @@ const ed = (path, value, tag = "span", attrs = "") =>
 const edLink = (path, value, url) =>
   ed(path, value, "a", ` href="${esc(url)}"`);
 
-/** 行级操作按钮：删除 / 改链接。绝对定位，不参与布局，打印时隐藏 */
-function ctl(delPath, label, urlPath) {
+/** 行级操作按钮：上移 / 下移 / 改链接 / 删除。
+    绝对定位在右侧页边距里，不参与布局，打印时隐藏。
+    opts: { move: 是否给上下移按钮, url: 链接字段的路径 } */
+function ctl(path, label, opts = {}) {
   let b = `<span class="ctl" contenteditable="false">`;
-  if (urlPath) {
-    b += `<button class="ctl-btn ctl-link" data-url="${esc(urlPath)}" title="修改链接地址">🔗</button>`;
+  if (opts.move) {
+    b += `<button class="ctl-btn ctl-move" data-move="${esc(path)}" data-dir="-1" title="上移${label}">↑</button>`
+       + `<button class="ctl-btn ctl-move" data-move="${esc(path)}" data-dir="1" title="下移${label}">↓</button>`;
   }
-  b += `<button class="ctl-btn ctl-del" data-del="${esc(delPath)}" title="删除${label}">✕</button>`;
+  if (opts.url) {
+    b += `<button class="ctl-btn ctl-link" data-url="${esc(opts.url)}" title="修改链接地址">🔗</button>`;
+  }
+  b += `<button class="ctl-btn ctl-del" data-del="${esc(path)}" title="删除${label}">✕</button>`;
   return b + `</span>`;
+}
+
+/** 新增按钮，放在左侧页边距，同样不参与布局。
+    btns: [{ path: 目标数组的路径, kind: 新条目模板名, label, title }] */
+function addbar(btns) {
+  return `<span class="addbar" contenteditable="false">`
+    + btns.map(b =>
+        `<button class="ctl-btn ctl-add" data-add="${esc(b.path)}" `
+        + `data-kind="${esc(b.kind)}" title="${esc(b.title)}">${esc(b.label)}</button>`).join("")
+    + `</span>`;
+}
+
+/** 各类板块在标题行左边提供哪些「＋」 */
+function sectionAdds(s, p) {
+  if (s.type === "education") return [
+    { path: `${p}.items`, kind: "eduItem",   label: "＋学校", title: "加一行教育经历" },
+    { path: `${p}.notes`, kind: "note",      label: "＋备注", title: "加一条备注（GPA、获奖等）" }];
+  if (s.type === "skills") return [
+    { path: `${p}.lines`, kind: "skillLine", label: "＋行",   title: "加一行" }];
+  if (s.type === "campus") return [
+    { path: `${p}.items`, kind: "campusItem", label: "＋行",  title: "加一行" }];
+  return [
+    { path: `${p}.items`, kind: "entry",     label: "＋经历", title: "加一段经历" }];
 }
 
 /** 顶部信息区的一个字段：标签 + 值（值可能是链接） */
@@ -51,7 +83,7 @@ function field(line, i, j, f) {
                 : ed(base + ".value", f.value));
   return `<span class="fld">`
     + `<span class="lab">${ed(base + ".label", f.label)}：</span>${val}`
-    + ctl(base, "这个字段", f.url ? base + ".url" : null)
+    + ctl(base, "这个字段", { url: f.url ? base + ".url" : null })
     + `</span>`;
 }
 
@@ -79,7 +111,7 @@ function bullet(b, p) {
     ? edLink(p + ".text", b.text ?? b.url, b.url)
     : ed(p + ".text", b.text);
   return `<div class="bullet"><span class="sq"></span>${inner}`
-    + ctl(p, "这条要点", b.url ? p + ".url" : null) + `</div>`;
+    + ctl(p, "这条要点", { move: true, url: b.url ? p + ".url" : null }) + `</div>`;
 }
 
 function section(s, i) {
@@ -87,7 +119,8 @@ function section(s, i) {
   let h = `<div class="sec">`
     + `<div class="sec-title">${ICONS[s.icon] || ICONS._default}`
     + `<span class="ed" contenteditable="true" data-path="${p}.title">${esc(s.title)}</span>`
-    + ctl(p, "整个板块") + `</div>`
+    + addbar(sectionAdds(s, p))
+    + ctl(p, "整个板块", { move: true }) + `</div>`
     + `<div class="sec-rule"></div>`;
 
   if (s.type === "education") {
@@ -101,12 +134,12 @@ function section(s, i) {
         + (it.degree ? `（${ed(q + ".degree", it.degree)}）` : ``)
         + `</span>`
         + `<span class="r gray small">${ed(q + ".date", it.date)}</span>`
-        + ctl(q, "这一行") + `</div>`;
+        + ctl(q, "这一行", { move: true }) + `</div>`;
     });
     (s.notes || []).forEach((n, j) => {
       const q = `${p}.notes.${j}`;
       h += `<div class="note"><span class="lab">${ed(q + ".label", n.label)}：</span>`
-        + ed(q + ".value", n.value) + ctl(q, "这一行") + `</div>`;
+        + ed(q + ".value", n.value) + ctl(q, "这一行", { move: true }) + `</div>`;
     });
 
   } else if (s.type === "skills") {
@@ -114,7 +147,7 @@ function section(s, i) {
       const q = `${p}.lines.${j}`;
       h += `<div class="skill"><span class="lab">${ed(q + ".label", l.label)}：</span>`
         + `<span class="val">${ed(q + ".value", l.value)}</span>`
-        + ctl(q, "这一行") + `</div>`;
+        + ctl(q, "这一行", { move: true }) + `</div>`;
     });
 
   } else if (s.type === "campus") {
@@ -124,7 +157,7 @@ function section(s, i) {
         + `<span class="l b">${ed(q + ".org", it.org)}</span>`
         + `<span class="c b">${ed(q + ".role", it.role)}</span>`
         + `<span class="r gray small">${ed(q + ".date", it.date)}</span>`
-        + ctl(q, "这一行") + `</div>`;
+        + ctl(q, "这一行", { move: true }) + `</div>`;
     });
 
   } else { // entries：实习 / 工作 / 项目 / 科研 / 竞赛
@@ -134,7 +167,8 @@ function section(s, i) {
         + `<span class="org">${ed(q + ".org", it.org)}</span>`
         + (it.role ? `<span class="role">${ed(q + ".role", it.role)}</span>` : ``)
         + `<span class="date gray small">${ed(q + ".date", it.date)}</span>`
-        + ctl(q, "整段经历") + `</div>`;
+        + addbar([{ path: `${q}.bullets`, kind: "bullet", label: "＋要点", title: "给这段经历加一条要点" }])
+        + ctl(q, "整段经历", { move: true }) + `</div>`;
       (it.bullets || []).forEach((b, k) => { h += bullet(b, `${q}.bullets.${k}`); });
       h += `</div>`;
     });

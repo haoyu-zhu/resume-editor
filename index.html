@@ -80,6 +80,27 @@
       </section>
 
       <section class="panel">
+        <h2>添加板块</h2>
+        <label class="row">
+          <span>选一个</span>
+          <select id="new-sec">
+            <option value="cert">证书</option>
+            <option value="lang">语言能力</option>
+            <option value="award">荣誉奖项</option>
+            <option value="portfolio">作品集</option>
+            <option value="work">工作经历</option>
+            <option value="research">科研经历</option>
+            <option value="contest">竞赛经历</option>
+            <option value="paper">论文专利</option>
+            <option value="custom">自定义标题…</option>
+          </select>
+        </label>
+        <button class="btn wide" id="btn-add-sec">添加到简历</button>
+        <p class="hint">新板块会插在「自我总结」前面。想换位置用板块标题右边的 ↑ ↓。<br>
+           板块里加行、加要点：把鼠标移到标题或某段经历上，<b>左边</b>会冒出「＋」。</p>
+      </section>
+
+      <section class="panel">
         <h2>照片</h2>
         <div class="btn-row">
           <label class="btn" for="photo-file">换一张</label>
@@ -92,7 +113,7 @@
       <section class="panel">
         <h2>反悔</h2>
         <div class="btn-row">
-          <button class="btn" id="btn-undo" disabled>撤销删除</button>
+          <button class="btn" id="btn-undo" disabled>撤销</button>
           <button class="btn" id="btn-revert">还原全部</button>
         </div>
       </section>
