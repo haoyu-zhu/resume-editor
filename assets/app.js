@@ -1,10 +1,14 @@
 /* ============================================================
    简历微调器 —— 编辑器逻辑
-   数据流：resume.json  →  内存里的 state.data  →  渲染
-   改字不重渲染（DOM 已经显示对了），只有删条目/换照片才重渲染。
+
+   数据流：resume.json → 内存里的 state.data → 渲染。
+   state.data 始终是唯一真源，导出的就是它。
+
+   改字**不重渲染**（DOM 已经显示对了，重渲染只会让光标乱跳），
+   只有增删、移动、换照片这类结构性改动才重渲染。
    ============================================================ */
 
-/* ---- 版面档位，与 resume-tailor 的 render.py FIT_LADDER 保持一致 ---- */
+/* ---- 版面档位：从最松到最紧，对应 resume.css 里那几个变量 ---- */
 const LADDER = [
   { base: 13.5,  leading: 1.14, secAbove: 9,   titleGap: 3.5, secBelow: 5,   item: 3.5, entry: 7.5, photo: 3.05 },
   { base: 12.75, leading: 1.11, secAbove: 8,   titleGap: 3,   secBelow: 4.5, item: 3,   entry: 6.8, photo: 2.95 },
@@ -57,6 +61,39 @@ const SECTION_PRESETS = {
   paper:     { title: "论文专利", type: "entries", icon: "research" },
   research:  { title: "科研经历", type: "entries", icon: "research" },
 };
+
+/** 空白简历骨架 —— 手上什么都没有时从这里起步 */
+function blankResume() {
+  return {
+    meta: { photo: null, fit: 3 },
+    basics: {
+      name: "你的名字",
+      lines: [
+        [{ label: "电话", value: "手机号" },
+         { label: "邮箱", value: "邮箱地址" },
+         { label: "住址", value: "城市" }],
+        [{ label: "毕业院校", value: "学校" },
+         { label: "学历", value: "本科" },
+         { label: "毕业时间", value: "2027.6" },
+         { label: "求职意向", value: "岗位名称", strong: true }]
+      ]
+    },
+    sections: [
+      { type: "education", icon: "edu", title: "教育经历",
+        items: [ADD_TEMPLATES.eduItem()],
+        notes: [{ label: "GPA", value: "3.6/4.0（专业排名 10/100）" }] },
+      { type: "skills", icon: "star", title: "个人技能",
+        lines: [{ label: "专业技能", value: "把和岗位相关的硬技能写在这里" },
+                { label: "工具", value: "用过的软件、语言、平台" }] },
+      { type: "entries", icon: "job", title: "实习经历",
+        items: [ADD_TEMPLATES.entry()] },
+      { type: "entries", icon: "folder", title: "项目经历",
+        items: [ADD_TEMPLATES.entry()] },
+      { type: "skills", icon: "note", title: "自我总结",
+        lines: [{ label: "自我评价", value: "三到五条，尽量每条都能在上面的经历里找到对应" }] }
+    ]
+  };
+}
 
 const LS_DATA = "resume-editor:data";
 const LS_VARS = "resume-editor:vars";
@@ -300,6 +337,11 @@ function bind() {
   $("#btn-sample").addEventListener("click", () => {
     if (window.SAMPLE) loadData(clone(window.SAMPLE));
     else alert("示例没加载上，检查 assets/sample.js 是否和网页放在一起。");
+  });
+  $("#btn-blank").addEventListener("click", () => {
+    if (state.data && !confirm("新建一份空白简历？当前内容会被替换。")) return;
+    loadData(blankResume());
+    focusPath("basics.name");
   });
 
   // ---- 改字：只写回数据，不重渲染（DOM 已经是对的）----

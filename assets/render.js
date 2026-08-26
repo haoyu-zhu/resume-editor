@@ -1,11 +1,15 @@
 /* ============================================================
    resume.json -> DOM
-   结构必须和 resume-tailor skill 的 templates/resume.html.j2 一一对应，
-   否则网页上改出来的版面和 skill 直接生成的 PDF 会对不上。
 
-   两条约定：
-   - 可编辑的叶子节点带 class="ed" + data-path="到 JSON 的路径"
-   - 可删除的整行带 data-del="到 JSON 的路径"
+   生成的结构要和 assets/resume.css 里的选择器对得上；
+   格式定义见 SCHEMA.md。
+
+   三条约定：
+   - 可编辑的叶子节点带 class="ed" + data-path="到 JSON 的路径"，
+     改完按这个路径写回数据，不用从 DOM 反推结构
+   - 增删移动的按钮带 data-add / data-del / data-move
+   - 所有按钮一律绝对定位在页边距里，不参与排版 ——
+     否则编辑时看到的版面就和打印出来的不一样了
    ============================================================ */
 
 const ICONS = {

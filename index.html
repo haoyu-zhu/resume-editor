@@ -17,13 +17,14 @@
   <!-- ====================== 侧栏 ====================== -->
   <aside class="sidebar">
     <h1>简历微调器</h1>
-    <p class="lede">导入 <code>resume.json</code>，直接在纸面上改字、调版面、删条目，然后打印成 PDF。<b>所有数据只留在你自己的浏览器里，不上传。</b></p>
+    <p class="lede">在纸面上直接改字、调版面、增删条目，打印成一页纸 PDF。<b>所有数据只留在你自己的浏览器里，不上传。</b></p>
 
     <div id="restored" class="notice" hidden>已恢复上次没改完的内容。</div>
 
     <section class="panel">
-      <h2>简历文件</h2>
-      <label class="btn primary" for="file">选择 resume.json</label>
+      <h2>开始</h2>
+      <button class="btn primary wide" id="btn-blank">新建空白简历</button>
+      <label class="btn wide" for="file">打开 resume.json</label>
       <input type="file" id="file" accept=".json,application/json" hidden>
       <div class="btn-row">
         <button class="btn" id="btn-paste">粘贴 JSON</button>
@@ -139,8 +140,9 @@
   <div id="empty" class="empty">
     <div class="empty-inner">
       <div class="empty-icon">📄</div>
-      <h2>把 resume.json 拖进来</h2>
-      <p>或者用左边的「选择 resume.json」。<br>没有文件的话，可以先「看示例」。</p>
+      <h2>从「新建空白简历」开始</h2>
+      <p>已经有 <code>resume.json</code> 的话，把它拖到这里就行。<br>
+         想先看看长什么样，点左边的「看示例」。</p>
     </div>
   </div>
 
