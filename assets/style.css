@@ -24,11 +24,29 @@ body{
   padding:18px 16px 40px; position:sticky; top:0; max-height:100vh; overflow-y:auto;
 }
 .sidebar h1{ font-size:18px; margin:0 0 8px; }
-.lede{ font-size:12.5px; line-height:1.6; color:#5b6675; margin:0 0 14px; }
-.lede code{ background:#f1f3f7; padding:1px 4px; border-radius:3px; }
+
+/* 标题行：应用名 + 撤销/重做。这两个动作全程都在用，放在最上面一直够得着，
+   不跟着「反悔」面板一起沉到侧栏底下。两个箭头互为镜像，方向就是语义。 */
+.titlebar{ display:flex; align-items:center; gap:10px; margin:0 0 8px; }
+.titlebar h1{ margin:0; }
+.histbar{ display:flex; gap:4px; margin-left:auto; }
+.hist-btn{
+  width:28px; height:28px; padding:0; display:grid; place-items:center;
+  border:1px solid #ccd3dd; background:#fff; border-radius:6px;
+  color:#5b6675; cursor:pointer;
+}
+.hist-btn svg{ width:17px; height:17px; display:block; }
+.hist-btn:hover:not(:disabled){ border-color:#8fa8c9; background:#f7faff; color:rgb(28,90,180); }
+.hist-btn:disabled{ opacity:.35; cursor:default; }
 .notice{
   background:#eaf3ff; border:1px solid #c7ddfa; color:#1c5ab4;
   padding:7px 10px; border-radius:6px; font-size:12.5px; margin-bottom:12px;
+  line-height:1.6;
+}
+.notice.warn{ background:#fff4e8; border-color:#f2c99a; color:#8a4b12; }
+kbd{
+  font-family:inherit; font-size:11px; background:#f1f3f7; border:1px solid #d7dde6;
+  border-bottom-width:2px; border-radius:4px; padding:0 4px; color:#39424f;
 }
 .panel{ border-top:1px solid #eceff3; padding-top:14px; margin-top:14px; }
 .panel:first-of-type{ border-top:0; margin-top:0; padding-top:0; }
@@ -45,6 +63,10 @@ body{
 .btn.primary{ background:rgb(28,90,180); border-color:rgb(28,90,180); color:#fff; }
 .btn.primary:hover{ background:rgb(22,74,152); }
 .btn.wide{ display:block; width:100%; margin-bottom:7px; }
+/* 改过、还没导出 JSON。关页面时浏览器会拦一下，但那个对话框的文案改不了，
+   所以这里也得亮出来，让人知道该点的是这个按钮 */
+.btn.dirty{ border-color:rgb(28,90,180); color:rgb(28,90,180); font-weight:600; }
+.btn.dirty::after{ content:"·未导出"; font-weight:400; opacity:.7; margin-left:.35em; }
 .btn-row{ display:flex; gap:7px; margin-top:7px; flex-wrap:wrap; }
 .btn-row.end{ justify-content:flex-end; margin-top:14px; }
 .btn-row .btn{ flex:1 1 auto; }
@@ -56,6 +78,19 @@ body{
   font-family:inherit; font-size:12.5px; background:#fff;
 }
 .row.slider input[type=range]{ flex:1 1 auto; min-width:0; accent-color:rgb(28,90,180); }
+.row input[type=color]{
+  flex:1 1 auto; height:28px; padding:2px; border:1px solid #ccd3dd;
+  border-radius:5px; background:#fff; cursor:pointer;
+}
+
+/* ---------------- 主题色板 ---------------- */
+.swatches{ display:flex; gap:7px; margin-bottom:10px; }
+.swatch{
+  width:30px; height:30px; border-radius:6px; cursor:pointer;
+  border:2px solid transparent; box-shadow:0 0 0 1px #d7dde6 inset;
+}
+.swatch:hover{ transform:translateY(-1px); }
+.swatch.on{ border-color:#39424f; }
 .row.slider b{ flex:0 0 38px; text-align:right; font-weight:600; color:#39424f;
                font-variant-numeric:tabular-nums; }
 
@@ -83,7 +118,17 @@ body{
 /* ---------------- 纸张舞台 ---------------- */
 .stage{ flex:1 1 auto; padding:24px; display:flex; justify-content:center;
         align-items:flex-start; overflow:auto; min-height:100vh; }
-.paper{ transform-origin:top center; }
+/* flex:0 0 auto 是要害：.paper 是 .stage 的 flex item，默认允许收缩，
+   窗口一窄纸就被物理压扁，内容跟着重排 —— 屏幕上的版面就不再是打印出来的版面了。
+   缩放一律只走 fitZoom 的 transform（不影响布局），纸的宽度永远是 21cm。 */
+.paper{ transform-origin:top center; position:relative; flex:0 0 auto; }
+
+/* ---------------- 分页 ---------------- */
+/* 纸是一张一张画的（.sheet 在 resume.css 里），垫在内容底下；
+   内容仍然是一条连续的流，靠 --push 把跨页的整块推到下一页开头。 */
+#sheets{ position:absolute; inset:0; pointer-events:none; z-index:0; }
+#doc{ position:relative; z-index:1; }
+#doc .pushed{ padding-top:var(--push,0px); }
 
 /* ---------------- 可编辑节点 ---------------- */
 .ed{ outline:none; border-radius:2px; }
@@ -91,39 +136,131 @@ body{
 .ed:focus{ background:rgba(255,214,0,.16); box-shadow:0 0 0 2px rgba(255,214,0,.16); }
 .ed:empty::after{ content:"（空）"; color:#b8c0cc; }
 
-/* 行级操作按钮：绝对定位，不参与排版；平时透明，鼠标移上去才出现 */
+/* 行级操作按钮：绝对定位，不参与排版。
+   ------------------------------------------------------------------
+   这一组按钮踩过三个坑，改之前先看明白：
+
+   1) 按钮和行之间**不能留 margin**。margin 在元素的命中区之外，鼠标从行里
+      往按钮走，中间那几个像素既不属于行也不属于按钮，:hover 当场断掉 ——
+      按钮就在手指底下消失了。距离一律用 padding 撑，padding 算命中区。
+
+   2) 收起不能用 pointer-events。它是瞬时的：opacity 还在淡出，按钮已经点不
+      到了。改用 visibility + 延迟，鼠标离开后还留 0.4s 的宽限期。
+
+   3) 光标落在哪一行，哪一行的按钮就**钉住不动**（.is-active，由 app.js 挂）。
+      光靠悬停撑不住：信息区一个字段才几十像素宽，鼠标一路悬停过去太苛刻。
+      钉住之后可以慢慢走、慢慢点，这才是主路径，悬停只是顺手的快捷方式。
+   ------------------------------------------------------------------ */
 .paper .bullet, .paper .entry, .paper .sec-title, .paper .row3,
-.paper .skill, .paper .note, .paper .fld, .paper .entry-head{ position:relative; }
+.paper .skill, .paper .note, .paper .fld, .paper .entry-head,
+.paper .idline, .paper .nameline{ position:relative; }
 
-.ctl{
-  position:absolute; left:100%; top:0; margin-left:3px;
-  display:flex; gap:2px; opacity:0; pointer-events:none;
-  transition:opacity .1s; z-index:5; white-space:nowrap;
+.ctl, .addbar{
+  position:absolute; top:0; display:flex; gap:2px;
+  opacity:0; visibility:hidden; z-index:5; white-space:nowrap;
+  /* 出现是瞬时的（见下面 :hover / .is-active 里的 transition:none）；
+     这条只管**收起**：先原地停 0.28s 再淡出，visibility 拖到 0.4s 才关，
+     鼠标离开之后还留一段仍然点得到的宽限期。 */
+  transition:opacity .12s ease .28s, visibility 0s .4s;
 }
-.bullet:hover > .ctl, .entry:hover > .entry-head > .ctl, .sec-title:hover > .ctl,
-.row3:hover > .ctl, .skill:hover > .ctl, .note:hover > .ctl, .fld:hover > .ctl{
-  opacity:1; pointer-events:auto;
+.ctl{ left:100%; padding-left:4px; }        /* 删/移/链接：右页边距 */
+.addbar{ right:100%; padding-right:4px; }   /* 「＋」：左页边距，和上面分开 */
+
+/* 显示条件：鼠标悬停在这一行，或者光标就在这一行里 */
+.bullet:hover      > .ctl, .bullet.is-active  > .ctl,
+.row3:hover        > .ctl, .row3.is-active    > .ctl,
+.skill:hover       > .ctl, .skill.is-active   > .ctl,
+.note:hover        > .ctl, .note.is-active    > .ctl,
+.fld:hover         > .ctl, .fld.is-active     > .ctl,
+.idline:hover      > .ctl, .idline.is-active  > .ctl,
+.sec-title:hover   > .ctl, .sec.is-active     > .sec-title > .ctl,
+.entry:hover > .entry-head > .ctl, .entry.is-active > .entry-head > .ctl,
+.bullet:hover      > .addbar, .bullet.is-active   > .addbar,
+.row3:hover        > .addbar, .row3.is-active     > .addbar,
+.idline:hover      > .addbar, .idline.is-active   > .addbar,
+.nameline:hover    > .addbar, .nameline.is-active > .addbar{
+  opacity:1; visibility:visible; transition:none;
 }
+
 .ctl-btn{
-  width:18px; height:18px; line-height:1; padding:0; cursor:pointer;
+  width:20px; height:20px; line-height:1; padding:0; cursor:pointer;
   border:1px solid #d7dde6; background:#fff; border-radius:4px;
-  font-size:10px; color:#7b8595; font-family:inherit;
+  font-size:11px; color:#7b8595; font-family:inherit;
 }
+/* 默认样式偏「危险」，因为这一排里删除是唯一不可逆的动作 */
 .ctl-btn:hover{ background:#fff0f0; border-color:#e3a0a0; color:#c23b3b; }
-.ctl-link:hover, .ctl-move:hover{ background:#eef5ff; border-color:#9dbde8; color:rgb(28,90,180); }
-
-/* 「＋」放在左侧页边距，和右边的删除/移动分开，免得挤在一起认错 */
-.addbar{
-  position:absolute; right:100%; top:0; margin-right:3px;
-  display:flex; gap:2px; opacity:0; pointer-events:none;
-  transition:opacity .1s; z-index:5; white-space:nowrap;
+.ctl-link:hover, .ctl-grip:hover, .ctl-wrap:hover{
+  background:#eef5ff; border-color:#9dbde8; color:rgb(28,90,180);
 }
-.sec-title:hover > .addbar, .entry-head:hover > .addbar{ opacity:1; pointer-events:auto; }
-.ctl-add{ width:auto; padding:0 4px; font-size:10px; }
+.ctl-grip{ cursor:grab; }
+.ctl-grip:active{ cursor:grabbing; }
+.ctl-wrap{ font-size:12px; }
+
+/* 板块和条目的「＋」改挂到标题文字右边（纸内），不再缩在页边距里。
+   板块那个常驻淡显 —— 用户找不到「在哪里添加」，根本原因就是
+   不悬停就完全没有任何迹象表明这里有东西。 */
+.sec-head > .addbar, .entry-lead > .addbar{
+  left:100%; right:auto; padding-left:7px; padding-right:0;
+}
+.sec-head > .addbar{ opacity:.4; visibility:visible; transition:none; }
+.sec-title:hover .sec-head > .addbar,
+.sec.is-active   .sec-head > .addbar{ opacity:1; }
+.entry-head:hover .entry-lead > .addbar,
+.entry.is-active  .entry-lead > .addbar{
+  opacity:1; visibility:visible; transition:none;
+}
+.ctl-add{ width:auto; padding:0 6px; font-size:10px; }
 .ctl-add:hover{ background:#eefaf0; border-color:#8fc79c; color:#1e7a37; }
 
-/* 顶部信息区的字段挨得紧，按钮盖在后面一点，加个白底免得糊在一起 */
-.fld .ctl{ background:#fff; box-shadow:0 0 0 3px #fff; }
+/* 信息区的字段是横着一个挨一个排的。按钮要是还挂在字段右边，会压在下一个
+   字段的字上；更糟的是鼠标往右走会先碰到下一个字段，把**那一组**按钮换出来，
+   人还没走到就已经换了一套。改成浮在字段正上方的一张小卡片：
+   不挡同一行的邻居，也不和邻居抢悬停，上下贴着字段没有真空带。 */
+.fld > .ctl{
+  left:-4px; top:auto; bottom:100%;
+  padding:3px; gap:3px;
+  background:#fff; border:1px solid #dfe5ee; border-radius:7px;
+  box-shadow:0 3px 10px rgba(20,30,50,.16);
+}
+
+/* ---------------- 拖拽排序 ---------------- */
+/* 插入位置一律用 box-shadow 画，不用 border ——
+   border 会把行撑高，拖动过程中版面跟着抖，看着像内容真的变了 */
+.dragging{ opacity:.4; }
+.drop-before{ box-shadow:0 -2px 0 0 rgb(28,90,180); }
+.drop-after { box-shadow:0  2px 0 0 rgb(28,90,180); }
+.fld.drop-before{ box-shadow:-2px 0 0 0 rgb(28,90,180); }
+.fld.drop-after { box-shadow: 2px 0 0 0 rgb(28,90,180); }
+
+/* ---------------- 板块图标选择器 ---------------- */
+#icon-pick{
+  position:absolute; z-index:60; display:flex; flex-direction:column; gap:6px; padding:7px;
+  background:#fff; border:1px solid #d7dde6; border-radius:8px;
+  box-shadow:0 10px 30px rgba(0,0,0,.16);
+}
+#icon-pick[hidden]{ display:none !important; }
+.ico-opt{
+  width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+  border:1px solid transparent; border-radius:5px; background:#fff; cursor:pointer;
+  color:rgb(28,90,180);
+}
+.ico-grid{ display:flex; gap:4px; }
+.ico-opt svg{ width:16px; height:16px; }
+/* 「不要图标」：和十个图标并排，但明显不是图标 */
+.ico-off{ font-size:15px; line-height:1; color:#98a2b1; }
+.ico-off:hover{ color:#c0392b; }
+.ico-foot{ border-top:1px solid #eef1f5; padding-top:6px; }
+.ico-all{
+  width:100%; border:0; background:none; padding:3px 0; cursor:pointer;
+  font:inherit; font-size:11.5px; color:#7b8595; border-radius:4px;
+}
+.ico-all:hover{ background:#fdf0ee; color:#c0392b; }
+.ico-opt:hover{ background:#eef5ff; border-color:#9dbde8; }
+.ico-opt.on{ background:#eef5ff; border-color:rgb(28,90,180); }
+
+/* 纸上的图标按钮：平时看不出是按钮，鼠标移上去才提示可点 */
+.ico-btn{ cursor:pointer; border-radius:3px; }
+.sec-title:hover .ico-btn{ box-shadow:0 0 0 2px rgba(28,90,180,.18); }
 
 /* ---------------- 打印对话框 ---------------- */
 dialog{
@@ -134,16 +271,71 @@ dialog::backdrop{ background:rgba(20,26,36,.45); }
 dialog h2{ font-size:16px; margin:0 0 14px; }
 dialog ol{ margin:0; padding-left:20px; font-size:13px; line-height:1.75; }
 dialog li{ margin-bottom:9px; }
+.checkline{ display:flex; align-items:center; gap:7px; font-size:12.5px;
+            color:#5b6675; margin-top:14px; cursor:pointer; }
 
 /* ============================================================
    打印：只留纸
    ============================================================ */
 @media print{
   body{ background:#fff; }
-  .sidebar, .empty, #probe, .ctl, .addbar, dialog{ display:none !important; }
+  .sidebar, .empty, #probe, .ctl, .addbar, dialog, #sheets, #icon-pick, #tour{
+    display:none !important;
+  }
+  /* 图标按钮本身要留着（它就是图标），只是不能带任何按钮的痕迹 */
+  .ico-btn{ box-shadow:none !important; }
+  .dragging{ opacity:1 !important; }
+  .drop-before, .drop-after{ box-shadow:none !important; }
   .app{ display:block; }
   .stage{ padding:0; margin:0; display:block; min-height:0; overflow:visible; }
   .paper{ transform:none !important; }
   .ed{ background:none !important; box-shadow:none !important; }
   .ed:empty::after{ content:""; }
+}
+
+/* ============================================================
+   新手指引：遮罩 + 高亮圈 + 气泡 + 打圈的手绘箭头
+   全部是 position:fixed 的浮层，不参与页面布局；打印时整个 #tour 隐藏。
+   ============================================================ */
+body.tour-on{ overflow:hidden; }              /* 指引期间别让底下跟着滚 */
+
+#tour-mask, #tour-arrow{
+  position:fixed; inset:0; width:100vw; height:100vh; z-index:200; pointer-events:none;
+}
+#tour-hole{ fill:rgba(17,24,36,.55); }
+#tour-mask{ pointer-events:auto; }             /* 挡住底下的误点 */
+
+#tour-line{
+  fill:none; stroke:#ffd34d; stroke-width:2.6;
+  stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 1px 3px rgba(0,0,0,.45));
+  transition:stroke-dashoffset .62s cubic-bezier(.35,.9,.4,1);
+}
+#tour-head path{ fill:#ffd34d; }
+
+#tour-ring{
+  position:fixed; z-index:201; pointer-events:none; border-radius:8px;
+  border:2px solid #ffd34d; box-shadow:0 0 0 3px rgba(255,211,77,.28);
+}
+
+#tour-bubble{
+  position:fixed; z-index:202; background:#fff; border-radius:10px;
+  padding:14px 16px 12px; box-shadow:0 14px 44px rgba(0,0,0,.3);
+  font-size:13px; line-height:1.7; color:#2b3444;
+}
+#tour-bubble h3{ margin:0 0 6px; font-size:14.5px; color:rgb(28,90,180); }
+#tour-bubble p{ margin:0 0 12px; }
+#tour-bubble kbd{
+  font:inherit; font-size:11.5px; background:#f1f3f7; border:1px solid #d7dde6;
+  border-radius:3px; padding:0 4px;
+}
+.tour-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+#tour-step{ font-size:11.5px; color:#8a94a3; letter-spacing:.03em; }
+.tour-btns{ display:flex; gap:6px; }
+.tour-btns .btn{ padding:4px 10px; font-size:12px; }
+
+/* 平时 visibility:hidden 的行内按钮，指引要指它就得先逼出来 */
+.tour-reveal > .ctl, .tour-reveal > .addbar,
+.tour-reveal > .sec-head > .addbar, .tour-reveal > .entry-head > .ctl{
+  opacity:1 !important; visibility:visible !important; transition:none !important;
 }

@@ -1,67 +1,161 @@
-/* 示例简历（虚构人物、虚构数据，仅用于演示界面）
+/* 示例简历（人物出自钱锺书《围城》，情节为小说虚构，仅用于演示界面）
    做成 js 常量而不是 sample.json，是为了本地双击 index.html 打开时也能用 ——
-   file:// 协议下 fetch 会被 CORS 拦掉。 */
+   file:// 协议下 fetch 会被 CORS 拦掉。
+   photo 留 null：运行时由 normalizePhoto 填成 photo.js 里的默认占位图，
+   别把那一大段 base64 复制进来，会让这个文件涨到几十 KB。
+   meta 里有 vars 就以 vars 为准（fit 被忽略），所以这里不写 fit。 */
 window.SAMPLE = {
-  "meta": { "target_title": "数据分析师", "photo": null, "playbook": "data", "fit": 3 },
+  "meta": {
+    "target_title": "大学教职",
+    "photo": null,
+    "theme": {"accent": "#255fb6", "accentDark": "#183e76", "link": "#4c7cc3"},
+    "vars": {"base": 10.75, "leading": 1.14, "secAbove": 6, "titleGap": 3, "secBelow": 3.5, "item": 2.6, "entry": 5, "photo": 2.85, "padT": 0.8, "padB": 0.8, "padX": 1}
+  },
   "basics": {
-    "name": "张明（示例）",
+    "name": "方鸿渐",
     "lines": [
-      [{ "label": "电话", "value": "138****0000" },
-       { "label": "邮箱", "value": "zhangming@example.com" },
-       { "label": "住址", "value": "浙江杭州" }],
-      [{ "label": "毕业院校", "value": "示例大学" },
-       { "label": "学历", "value": "本科" },
-       { "label": "毕业时间", "value": "2027.6" },
-       { "label": "求职意向", "value": "数据分析师", "strong": true }],
-      [{ "label": "GitHub", "value": "https://github.com/example", "url": "https://github.com/example" }]
+      [
+        {"label": "电话", "value": "上海 三〇一七"},
+        {"label": "通信处", "value": "上海法租界周公馆转"},
+        {"label": "籍贯", "value": "江苏"}
+      ],
+      [
+        {"label": "毕业院校", "value": "克莱登大学"},
+        {"label": "学历", "value": "哲学博士"},
+        {"label": "归国时间", "value": "1937.7"},
+        {"label": "求职意向", "value": "大学教职", "strong": true}
+      ],
+      [
+        {"label": "介绍人", "value": "赵辛楣（三闾大学政治系）、周经理（点金银行）"}
+      ],
+      [
+        {"label": "Github", "value": "https://haoyu-zhu.github.io/JAM_Web", "url": "https://haoyu-zhu.github.io/JAM_Web"}
+      ]
     ]
   },
   "sections": [
-    { "type": "education", "icon": "edu", "title": "教育经历",
+    {
+      "type": "education",
+      "icon": "none",
+      "title": "教育经历",
       "items": [
-        { "date": "2023.9 - 2027.6", "org": "示例大学", "tag": "211", "major": "统计学", "degree": "本科" }
+        {"date": "1937.4 - 1937.6", "org": "克莱登大学", "tag": "QS 100", "major": "哲学", "degree": "博士"},
+        {"date": "1933.9 - 1937.2", "org": "伦敦大学 / 巴黎大学 / 柏林大学", "tag": "游学", "major": "旁听", "degree": "未取学位"},
+        {"date": "1929.9 - 1933.6", "org": "北平某大学", "tag": "双一流", "major": "中国文学", "degree": "本科"}
       ],
       "notes": [
-        { "label": "GPA", "value": "3.7/4.0（专业排名 8/92）" },
-        { "label": "主修课程", "value": "概率论、数理统计、回归分析、数据库原理、机器学习。" }
-      ] },
-
-    { "type": "skills", "icon": "star", "title": "个人技能",
-      "lines": [
-        { "label": "分析", "value": "SQL（窗口函数、性能调优），Python（pandas / scikit-learn），AB 实验设计，漏斗与归因分析。" },
-        { "label": "工具", "value": "Tableau，Power BI，Excel（数据透视、Power Query），Git。" },
-        { "label": "语言", "value": "英语 CET-6（562）。" }
-      ] },
-
-    { "type": "entries", "icon": "job", "title": "实习经历",
+        {"label": "转系情况", "value": "本科四年，先入社会学系，一年后转哲学系，再一年转中国文学系毕业。"},
+        {"label": "学位说明", "value": "学位系通信办理，全程未赴校，文凭一纸，费用一百美金（原价四百，议价核减）。"},
+        {"label": "获奖", "value": "1930年辩论赛季军"}
+      ]
+    },
+    {
+      "type": "entries",
+      "icon": "none",
+      "title": "工作经历",
       "items": [
-        { "date": "2026.6 - 2026.9", "org": "某电商平台", "role": "数据分析实习生",
+        {
+          "date": "1939.9 - 至今",
+          "org": "华美新闻社",
+          "role": "资料室主任",
           "bullets": [
-            { "label": "流失归因", "text": "拆解新用户注册漏斗，定位到实名认证环节流失占比 47%，推动表单字段从 9 个精简到 5 个，次周注册转化率从 31% 提升到 39%。" },
-            { "label": "报表自动化", "text": "用 Python + SQL 重写 6 张日报，把每天 2 小时的手工取数压缩到 10 分钟自动跑批，被组内 4 人日常使用。" },
-            { "text": "参与 3 次 AB 实验的指标设计与结果复盘，其中 2 次结论被采纳并全量上线。" }
-          ] }
-      ] },
-
-    { "type": "entries", "icon": "folder", "title": "项目经历",
-      "items": [
-        { "date": "2026.3 - 2026.5", "org": "校园二手交易平台用户行为分析", "role": "个人项目",
+            {"label": "本职", "text": "主持资料室，剪存中外报刊、编订索引，供采编查阅；到职以来资料调阅未误一次。"},
+            {"label": "增设", "text": "拟订「时局要闻分类表」一份，将来件按地域、机关、人事三目归档，检索时间由半日缩至一刻。"},
+            {"label": "离职说明", "text": "报馆易主，同人集体辞职，本人一并辞去，非因考绩。"}
+          ]
+        },
+        {
+          "date": "1938.9 - 1939.7",
+          "org": "国立三闾大学",
+          "role": "副教授",
           "bullets": [
-            { "label": "项目链接", "url": "https://github.com/example/campus-analysis", "text": "https://github.com/example/campus-analysis" },
-            { "label": "数据", "text": "抓取并清洗 3.2 万条商品发布与成交记录，构建用户—商品—时间三维分析表。" },
-            { "label": "结论", "text": "发现开学前两周成交量是平时的 2.8 倍，据此给平台运营提出错峰推广建议，被采纳为迎新季活动方案。" }
-          ] }
-      ] },
-
-    { "type": "campus", "icon": "flag", "title": "校园经历",
+            {"label": "聘任", "text": "应聘时函议为教授，到校后改聘副教授，月薪相应核减；因学历一节不便深究，未提异议。"},
+            {"label": "授课", "text": "在中国文学系任教，担任伦理学等课程；科目与所学渊源略有出入，讲义现成，尚能敷衍。"},
+            {"label": "兼办", "text": "兼任新生入学国文卷阅卷，两周阅卷四百余份；另代拟系务函件若干。"},
+            {"text": "次年未获续聘。同系另有一位克莱登大学出身的同事，则获续聘并升任系主任。"}
+          ]
+        },
+        {
+          "date": "1937.9 - 1938.7",
+          "org": "点金银行（上海）",
+          "role": "职员",
+          "bullets": [
+            {"label": "任职缘由", "text": "由亡妻家长辈周经理安排，职务内容未经界定，与所学专业亦无关涉。"},
+            {"text": "在职一年，按时到馆，经手事务未出差错，亦未见起色。", "label": "工作"},
+            {"label": "所长", "text": "熟悉本埠钱业往来文书格式；每日读中外报纸七八种，于时局物价略能道其大概。"}
+          ]
+        }
+      ]
+    },
+    {
+      "type": "entries",
+      "icon": "none",
+      "title": "公开演讲",
       "items": [
-        { "date": "2024.9 - 2025.6", "org": "校统计学社", "role": "数据组组长" }
-      ] },
-
-    { "type": "skills", "icon": "note", "title": "自我总结",
+        {
+          "date": "1937.8",
+          "org": "《西洋文化在中国历史上之影响及检讨》",
+          "role": "主讲",
+          "bullets": [
+            {"label": "场合", "text": "应本县县立中学之邀返乡演讲，听众约二百人，含地方绅商与在校师生。"},
+            {"label": "临场", "text": "讲稿于途中遗失，全程即席发挥，未借助任何文稿。"},
+            {"label": "结论", "text": "指出西洋文化传入中土之两大实绩为鸦片与梅毒。次日见诸地方报端，反响颇为热烈。"}
+          ]
+        }
+      ]
+    },
+    {
+      "type": "entries",
+      "icon": "none",
+      "title": "著述",
+      "items": [
+        {
+          "date": "1938 - 1939",
+          "org": "《伦理学讲义》",
+          "role": "编述 · 未刊",
+          "bullets": [
+            {"text": "为三闾大学授课所编，据现成教本删节改写而成，计八讲，学期终了即行搁置。"}
+          ]
+        },
+        {
+          "date": "1937",
+          "org": "《西洋文化在中国历史上之影响及检讨》",
+          "role": "讲稿 · 遗失",
+          "bullets": [
+            {"text": "赴县立中学途中遗失，未及补录；讲词大意见地方报次日所载，与本人原意略有出入。"}
+          ]
+        }
+      ]
+    },
+    {
+      "type": "skills",
+      "icon": "none",
+      "title": "个人技能",
       "lines": [
-        { "label": "自我评价", "value": "对数字敏感，习惯把问题拆到能被验证的粒度；做完分析一定追到「结论有没有被用上」这一步。" },
-        { "label": "爱好", "value": "长跑，摄影，看行业数据报告。" }
-      ] }
+        {"label": "语言", "value": "英文、法文、德文均可阅报；口语久疏，稍加温习可用。"},
+        {"label": "学术", "value": "于哲学、伦理学、中国文学皆有涉猎，兴趣颇广，心得全无。"},
+        {"label": "其他", "value": "长于辞令与临场应对；书信往还得体，惟多写而不寄。"}
+      ]
+    },
+    {
+      "type": "campus",
+      "icon": "none",
+      "title": "社会关系",
+      "items": [
+        {"date": "1933 - 1937", "org": "周氏（点金银行）", "role": "亡妻家，留学费用出资方"},
+        {"date": "1938 - 至今", "org": "赵辛楣", "role": "同事、荐主、至交"},
+        {"date": "1939.秋", "org": "孙柔嘉", "role": "妻，原三闾大学外文系助教"},
+        {"date": "—", "org": "方遯翁", "role": "父，前清举人，乡居"}
+      ]
+    },
+    {
+      "type": "skills",
+      "icon": "none",
+      "title": "自我总结",
+      "lines": [
+        {"label": "自我评价", "value": "不讨厌，可是全无用处。"},
+        {"label": "爱好", "value": "读书不求甚解，清谈，散步，与人辩论而后悔。"}
+      ]
+    }
   ]
 };

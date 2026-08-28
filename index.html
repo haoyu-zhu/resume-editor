@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>简历微调器</title>
+<title>简历生成器</title>
+<link rel="icon" href="assets/icon.png">
 <link rel="stylesheet" href="assets/resume.css">
 <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -16,10 +17,34 @@
 
   <!-- ====================== 侧栏 ====================== -->
   <aside class="sidebar">
-    <h1>简历微调器</h1>
-    <p class="lede">在纸面上直接改字、调版面、增删条目，打印成一页纸 PDF。<b>所有数据只留在你自己的浏览器里，不上传。</b></p>
+    <div class="titlebar">
+      <h1>简历生成器</h1>
+      <!-- 撤销 / 重做。两个互为镜像的回转箭头，是这类控件的通用画法；
+           id 沿用原来「反悔」面板里的那两个，逻辑不用动 -->
+      <div class="histbar" id="histbar" hidden>
+        <button class="hist-btn" id="btn-undo" disabled aria-label="撤销"
+                title="撤销（Ctrl+Z）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4.5 9h9.5a5.5 5.5 0 0 1 0 11h-3.5"/>
+            <polyline points="8.5 4.5 4 9 8.5 13.5"/>
+          </svg>
+        </button>
+        <button class="hist-btn" id="btn-redo" disabled aria-label="重做"
+                title="重做（Ctrl+Shift+Z）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19.5 9H10a5.5 5.5 0 0 0 0 11h3.5"/>
+            <polyline points="15.5 4.5 20 9 15.5 13.5"/>
+          </svg>
+        </button>
+      </div>
+    </div>
 
-    <div id="restored" class="notice" hidden>已恢复上次没改完的内容。</div>
+    <div id="storage-warn" class="notice warn" hidden>
+      <b>自动保存已停用。</b>内容超出了浏览器的存储配额（多半是证件照太大）。
+      现在关掉页面就会丢，请用下面的「下载改好的 JSON」自己存一份。
+    </div>
 
     <section class="panel">
       <h2>开始</h2>
@@ -29,21 +54,57 @@
       <div class="btn-row">
         <button class="btn" id="btn-paste">粘贴 JSON</button>
         <button class="btn" id="btn-sample">看示例</button>
+        </div>
+        <div class="btn-row">
+        <button class="btn" id="btn-tour">新手指引</button>
       </div>
     </section>
 
     <div id="editor-tools" hidden>
 
       <section class="panel">
-        <h2>版面占用</h2>
-        <div id="fill">
-          <div class="fill-track"><div id="fill-bar"></div></div>
-          <div id="fill-text">—</div>
-        </div>
-        <p class="hint" id="fill-hint"></p>
+        <h2>添加板块</h2>
+        <label class="row">
+          <span>选一个</span>
+          <select id="new-sec">
+            <optgroup label="经历类">
+              <option value="intern">实习经历</option>
+              <option value="work">工作经历</option>
+              <option value="project">项目经历</option>
+              <option value="research">科研经历</option>
+              <option value="contest">竞赛经历</option>
+              <option value="paper">论文专利</option>
+            </optgroup>
+            <optgroup label="清单类">
+              <option value="skills">个人技能</option>
+              <option value="cert">证书</option>
+              <option value="lang">语言能力</option>
+              <option value="award">荣誉奖项</option>
+              <option value="portfolio">作品集</option>
+              <option value="summary">自我总结</option>
+            </optgroup>
+            <optgroup label="其它">
+              <option value="edu">教育经历</option>
+              <option value="campus">校园经历</option>
+              <option value="custom">自定义标题…</option>
+            </optgroup>
+          </select>
+        </label>
+        <button class="btn wide" id="btn-add-sec">添加到简历</button>
+        <p class="hint">新板块会插在「自我总结」前面。想换位置，拖板块标题右边的 <b>⠿</b>。<br>
+           每个板块标题<b>右边就有「＋」</b>，点它往这个板块里加东西。</p>
       </section>
 
       <section class="panel">
+        <h2>文字</h2>
+        <div class="btn-row">
+          <button class="btn" id="btn-bold" disabled><b>B</b>&nbsp;&nbsp;加粗</button>
+        </div>
+        <p class="hint">在纸上划选一段字，点这里或按 <kbd>Ctrl</kbd>+<kbd>B</kbd>，再来一次取消。<br>
+           用来把一条长要点里的关键数字挑出来。</p>
+      </section>
+
+      <section class="panel" id="panel-layout">
         <h2>版面松紧</h2>
         <label class="row">
           <span>预设档位</span>
@@ -78,30 +139,43 @@
           <input type="range" id="sl-secBelow" min="0" max="10" step="0.5"><b id="val-secBelow"></b></label>
         <label class="row slider"><span>照片宽度</span>
           <input type="range" id="sl-photo" min="2" max="4" step="0.05"><b id="val-photo"></b></label>
+        <label class="row slider"><span>页顶留白</span>
+          <input type="range" id="sl-padT" min="0.3" max="2.5" step="0.05"><b id="val-padT"></b></label>
+        <label class="row slider"><span>页底留白</span>
+          <input type="range" id="sl-padB" min="0.3" max="2.5" step="0.05"><b id="val-padB"></b></label>
+        <label class="row slider"><span>左右留白</span>
+          <input type="range" id="sl-padX" min="0.3" max="3" step="0.05"><b id="val-padX"></b></label>
       </section>
 
       <section class="panel">
-        <h2>添加板块</h2>
+        <h2>主题色</h2>
+        <div id="swatches" class="swatches"></div>
+        <label class="row"><span>自己选一个</span>
+          <input type="color" id="theme-custom" value="#1c5ab4"></label>
+        <p class="hint">标签、横线、图标、链接会一起跟着换。深色系印出来更稳，越浅的颜色越容易在黑白打印机上糊掉。</p>
+      </section>
+
+      <section class="panel">
+        <h2>版面占用</h2>
+        <div id="fill">
+          <div class="fill-track"><div id="fill-bar"></div></div>
+          <div id="fill-text">—</div>
+        </div>
+        <p class="hint" id="fill-hint"></p>
         <label class="row">
-          <span>选一个</span>
-          <select id="new-sec">
-            <option value="cert">证书</option>
-            <option value="lang">语言能力</option>
-            <option value="award">荣誉奖项</option>
-            <option value="portfolio">作品集</option>
-            <option value="work">工作经历</option>
-            <option value="research">科研经历</option>
-            <option value="contest">竞赛经历</option>
-            <option value="paper">论文专利</option>
-            <option value="custom">自定义标题…</option>
+          <span>目标页数</span>
+          <select id="target-pages">
+            <option value="1">1 页（校招常规）</option>
+            <option value="2">2 页</option>
+            <option value="3">3 页</option>
+            <option value="0">不限</option>
           </select>
         </label>
-        <button class="btn wide" id="btn-add-sec">添加到简历</button>
-        <p class="hint">新板块会插在「自我总结」前面。想换位置用板块标题右边的 ↑ ↓。<br>
-           板块里加行、加要点：把鼠标移到标题或某段经历上，<b>左边</b>会冒出「＋」。</p>
+        <p class="hint">超过目标页数才会报红。内容多了会自动排到下一张纸上，
+           跨页的整段经历会被整块推到下一页，不会被切成两半。</p>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="panel-photo">
         <h2>照片</h2>
         <div class="btn-row">
           <label class="btn" for="photo-file">换一张</label>
@@ -113,23 +187,26 @@
 
       <section class="panel">
         <h2>反悔</h2>
-        <div class="btn-row">
-          <button class="btn" id="btn-undo" disabled>撤销</button>
-          <button class="btn" id="btn-revert">还原全部</button>
-        </div>
+        <button class="btn wide" id="btn-revert">还原全部</button>
+        <p class="hint">撤销 / 重做在<b>标题右边那两个箭头</b>上，快捷键
+           <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>。
+           在某个字段里打字时，<kbd>Ctrl</kbd>+<kbd>Z</kbd> 走浏览器自己的逐字撤销。
+           「还原全部」直接回到刚导入时。</p>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="panel-export">
         <h2>导出</h2>
         <button class="btn primary wide" id="btn-print">打印 / 存成 PDF</button>
         <button class="btn wide" id="btn-json">下载改好的 JSON</button>
-        <p class="hint">下载的 JSON 可以留着下次接着改，也可以发回给帮你改简历的人。</p>
+        <p class="hint">快捷键 <kbd>Ctrl</kbd>+<kbd>P</kbd> / <kbd>Ctrl</kbd>+<kbd>S</kbd>。
+           下载的 JSON 连版面参数和主题色一起带走，下次打开原样恢复。</p>
       </section>
 
       <section class="panel">
         <h2>显示比例</h2>
         <label class="row slider"><span>缩放</span>
           <input type="range" id="zoom" min="40" max="120" step="5"><b id="zoom-val"></b></label>
+        <button class="btn wide" id="btn-zoom-fit">适应窗口</button>
         <p class="hint">只影响屏幕上看着大小，不影响打印。</p>
       </section>
 
@@ -147,10 +224,16 @@
   </div>
 
   <main id="stage" class="stage" hidden>
-    <div class="paper"><div id="doc"></div></div>
+    <div class="paper">
+      <div id="sheets"></div>   <!-- 一页一张纸，垫在内容底下，不参与排版 -->
+      <div id="doc"></div>
+    </div>
   </main>
 
 </div>
+
+<!-- ====================== 板块图标选择器 ====================== -->
+<div id="icon-pick" hidden></div>
 
 <!-- ====================== 打印提示 ====================== -->
 <dialog id="print-tips">
@@ -158,18 +241,21 @@
   <ol>
     <li><b>页眉和页脚：关掉。</b>不关的话纸上会印出网址和日期。<br>
         （Chrome：展开「更多设置」→ 取消勾选「页眉和页脚」）</li>
-    <li><b>背景图形：勾上。</b>不勾的话蓝色横线和图标会全部消失。</li>
+    <li><b>背景图形：勾上。</b>不勾的话彩色横线和图标会全部消失。</li>
     <li><b>纸张 A4、边距选「默认」。</b>页边距已经写在网页里了，不用自己调。</li>
   </ol>
   <p class="hint">目标是「另存为 PDF」。如果版面和预览不一样，回来检查上面三项。</p>
+  <label class="checkline"><input type="checkbox" id="skip-tips"> 记住设置，以后别再提示我</label>
   <div class="btn-row end">
-    <button class="btn" onclick="document.getElementById('print-tips').close()">取消</button>
+    <button class="btn" id="btn-print-cancel">取消</button>
     <button class="btn primary" id="btn-print-go">好，去打印</button>
   </div>
 </dialog>
 
+<script src="assets/photo.js"></script>
 <script src="assets/sample.js"></script>
 <script src="assets/render.js"></script>
+<script src="assets/tour.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>
