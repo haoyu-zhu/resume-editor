@@ -257,5 +257,10 @@
 <script src="assets/render.js"></script>
 <script src="assets/tour.js"></script>
 <script src="assets/app.js"></script>
+<!-- Cloudflare Web Analytics —— 只统计访问量，无 Cookie、不做用户画像，
+     也碰不到简历内容（简历全程只在本机的内存和 localStorage 里）。
+     自己 fork 部署的话，把这一段删掉，或者换成你自己的 token。 -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "0a7872bcab8843e9aceebad20a0dc404"}'></script>
+<!-- End Cloudflare Web Analytics -->
 </body>
 </html>
