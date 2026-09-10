@@ -143,6 +143,14 @@
           <input type="range" id="sl-padT" min="0.3" max="2.5" step="0.05"><b id="val-padT"></b></label>
         <label class="row slider"><span>页底留白</span>
           <input type="range" id="sl-padB" min="0.3" max="2.5" step="0.05"><b id="val-padB"></b></label>
+        <!-- 上下留白一旦超过 0.8cm，浏览器打印时会自己往页边距里塞日期和网址
+             （原因见 app.js 里 HF_GUIDE 那段注释）。提示必须贴在这两根滑块正下方 ——
+             用户根本不会把「我调了留白」和「纸上多了页眉」联系起来。 -->
+        <p class="warn-inline" id="hf-warn" hidden>
+          <b id="hf-warn-where">页顶</b>留白超过 0.8cm 后，浏览器打印时会自己在这里加上
+          <b>日期和网址</b>。打印对话框里「更多设置」→ 取消勾选「页眉和页脚」即可。
+          <button class="btn tiny" id="btn-hf-fix">调回 0.8</button>
+        </p>
         <label class="row slider"><span>左右留白</span>
           <input type="range" id="sl-padX" min="0.3" max="3" step="0.05"><b id="val-padX"></b></label>
       </section>
@@ -237,14 +245,15 @@
 
 <!-- ====================== 打印提示 ====================== -->
 <dialog id="print-tips">
-  <h2>打印前，请在打印对话框里确认三件事</h2>
+  <h2>打印前，请在打印对话框里确认</h2>
   <ol>
-    <li><b>页眉和页脚：关掉。</b>不关的话纸上会印出网址和日期。<br>
-        （Chrome：展开「更多设置」→ 取消勾选「页眉和页脚」）</li>
-    <li><b>背景图形：勾上。</b>不勾的话彩色横线和图标会全部消失。</li>
-    <li><b>纸张 A4、边距选「默认」。</b>页边距已经写在网页里了，不用自己调。</li>
+    <li id="tip-hf" hidden><b>页眉和页脚：关掉。</b>不关的话纸上会印出网址和日期。
+        <span id="tip-hf-why" hidden>你把 <b id="tip-hf-val"></b> 调大了，所以这次<b>一定</b>会出现。</span><br>
+        （Chrome / Edge：展开「更多设置」→ 取消勾选「页眉和页脚」）</li>
+    <li id="tip-bg"><b>背景图形：勾上。</b>不勾的话彩色横线和图标会全部消失。</li>
+    <li id="tip-paper"><b>纸张 A4、边距选「默认」。</b>页边距已经写在网页里了，不用自己调。</li>
   </ol>
-  <p class="hint">目标是「另存为 PDF」。如果版面和预览不一样，回来检查上面三项。</p>
+  <p class="hint">目标是「另存为 PDF」。如果版面和预览不一样，回来检查上面几项。</p>
   <label class="checkline"><input type="checkbox" id="skip-tips"> 记住设置，以后别再提示我</label>
   <div class="btn-row end">
     <button class="btn" id="btn-print-cancel">取消</button>

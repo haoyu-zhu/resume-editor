@@ -67,6 +67,17 @@ kbd{
    所以这里也得亮出来，让人知道该点的是这个按钮 */
 .btn.dirty{ border-color:rgb(28,90,180); color:rgb(28,90,180); font-weight:600; }
 .btn.dirty::after{ content:"·未导出"; font-weight:400; opacity:.7; margin-left:.35em; }
+.btn.tiny{ padding:2px 8px; font-size:11px; margin-left:2px; vertical-align:1px; }
+
+/* 侧栏里的就地警告。用黄不用红：这不是「你错了」，是「你刚才那一下有个副作用」 */
+.warn-inline{
+  background:#fff8e1; border:1px solid #f0d99b; color:#7a5b12;
+  padding:8px 10px; border-radius:6px; font-size:12px; line-height:1.7;
+  margin:8px 0 2px;
+}
+.warn-inline b{ color:#6a4e0a; }
+/* 打印提示里，确实会撞上的那条要跳出来，不能和另外两条长得一样 */
+#print-tips #tip-hf{ background:#fff8e1; border-radius:5px; padding:5px 7px; }
 .btn-row{ display:flex; gap:7px; margin-top:7px; flex-wrap:wrap; }
 .btn-row.end{ justify-content:flex-end; margin-top:14px; }
 .btn-row .btn{ flex:1 1 auto; }

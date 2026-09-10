@@ -137,6 +137,27 @@ const LS_THEME = "resume-editor:theme";
 const LS_TIPS  = "resume-editor:skiptips";
 const LS_PAGES = "resume-editor:pages";
 
+/* ---- 打印时那个「自己冒出来的页眉页脚」 ----
+   Chromium（Chrome / Edge 同核）把页眉页脚画在 @page 的上下 margin 里，而且
+   **只有那条 margin 留得下才画**。实测阈值正好卡在 8mm：
+     上下留白 0.80cm → 干净
+     0.85cm         → 日期、网址、页码冒出来
+     1.00cm 以上     → 再加上网页标题
+   上下独立判定：顶大底小只出页眉，反过来只出页脚。
+
+   十档预设的 padT / padB 全是 0.8cm，正好压在线上，所以没动过滑块的人一辈子
+   看不到；而滑块 step 是 0.05，往右推一格就中招。真正阴的地方在于用户根本不会
+   把「我调了留白」和「纸上多了页眉」这两件事联系起来 —— 他们只会说「我啥也没调」。
+
+   有根治办法：在 @page 里声明六个空的 margin box，顶掉浏览器的默认内容
+   （逐格覆盖，必须六个全声明；Chrome / Edge 131+ 实测有效）。但那要在 @page 里
+   嵌套 at-rule，万一哪个解析器把整条 @page 判废，页边距就退回浏览器默认 ——
+   那是全局版面事故，比多印个页眉严重得多。**不冒这个险**，改成如实告知 + 一键修正。
+
+   HF_GUIDE 设成 false 即可整体回退到老行为：滑块旁不再提示，打印提示恒显示三条。 */
+const HF_GUIDE = true;
+const HF_SAFE  = 0.8;      // cm。上下留白超过它，浏览器就开始画页眉页脚
+
 const state = {
   data: null,        // 当前简历 JSON
   original: null,    // 导入时的原样，用于「还原」
@@ -421,9 +442,37 @@ function applyVars() {
   // 当前参数正好等于某个预设档位的话，下拉就显示那一档，别显示「自定义」
   $("#ladder").value = String(ladderHit());
   applyPageRule();
+  syncHfWarn();
   syncMeta();
   measure();
   persist();
+}
+
+/** 当前的上下留白会不会招来浏览器自己画的页眉页脚 */
+function hfRisky() {
+  if (!HF_GUIDE || !state.vars) return false;
+  return state.vars.padT > HF_SAFE || state.vars.padB > HF_SAFE;
+}
+
+/** 「页顶留白 1.2cm」这样的一句话。提示要指名道姓，别只说「可能会有页眉」 */
+function hfDesc() {
+  const p = [];
+  if (state.vars.padT > HF_SAFE) p.push(`页顶留白 ${state.vars.padT}cm`);
+  if (state.vars.padB > HF_SAFE) p.push(`页底留白 ${state.vars.padB}cm`);
+  return p.join("、");
+}
+
+/** 滑块旁那行就地提示。挂在 applyVars 上，拖到越界的当下就出现 ——
+    这是主渠道：它不受「以后别再提示我」影响，而且出现在因果发生的那一刻。 */
+function syncHfWarn() {
+  const box = $("#hf-warn");
+  if (!box) return;
+  box.hidden = !hfRisky();
+  if (box.hidden) return;
+  const over = [];
+  if (state.vars.padT > HF_SAFE) over.push("页顶");
+  if (state.vars.padB > HF_SAFE) over.push("页底");
+  $("#hf-warn-where").textContent = over.join(" / ");
 }
 
 function ladderHit() {
@@ -1072,6 +1121,13 @@ function bind() {
     });
   }
 
+  // ---- 「调回 0.8」：一键把上下留白压回不触发页眉页脚的位置 ----
+  $("#btn-hf-fix").addEventListener("click", () => {
+    state.vars.padT = Math.min(state.vars.padT, HF_SAFE);
+    state.vars.padB = Math.min(state.vars.padB, HF_SAFE);
+    applyVars();            // 里面会同步滑块、重排、存档，并把上面那行提示收掉
+  });
+
   // ---- 目标页数 ----
   $("#target-pages").addEventListener("change", (e) => {
     state.targetPages = Number(e.target.value);
@@ -1227,7 +1283,22 @@ function onKey(e) {
 
 function askPrint() {
   if (!state.data) return;
-  if (localStorage.getItem(LS_TIPS) === "1") { window.print(); return; }
+  const risky   = hfRisky();
+  const skipped = localStorage.getItem(LS_TIPS) === "1";
+  // 勾过「以后别再提示我」的人平时直接打印。但这次的留白确实会招来页眉页脚的话，
+  // 还是要拦一下 —— 「先勾了不再提示，几周后才想起来调留白」是很常见的顺序，
+  // 不拦的话这批人一点提醒都收不到。
+  if (skipped && !risky) { window.print(); return; }
+
+  // 越界补弹的那一次只亮相关的那一条，别把三件套又整个摆一遍
+  const only = skipped;
+  $("#tip-hf").hidden     = HF_GUIDE ? !risky : false;
+  $("#tip-hf-why").hidden = !risky;
+  if (risky) $("#tip-hf-val").textContent = hfDesc();
+  $("#tip-bg").hidden     = only;
+  $("#tip-paper").hidden  = only;
+  $(".checkline").hidden  = only;
+
   $("#skip-tips").checked = false;
   $("#print-tips").showModal();
 }
