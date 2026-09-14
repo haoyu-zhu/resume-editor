@@ -121,6 +121,10 @@
 /* ---------- 带标签要点 ---------- */
 .bullet{ padding-left:1.42em; text-indent:-1.42em; margin-top:var(--item-gap);
          text-align:justify; }
+/* 去掉方块的那一条（JSON 里 plain:true）：当成一段概述，左边和条目标题齐平。
+   悬挂缩进必须跟着一起去掉 —— 缩进本来就是为了让回行避开方块，方块没了
+   还留着缩进，整段会莫名其妙地往右缩一格。 */
+.bullet.plain{ padding-left:0; text-indent:0; }
 .bullet .sq{ display:inline-block; width:0.30em; height:0.30em;
              background:var(--accent); vertical-align:0.16em; margin-right:0.42em; }
 .bullet .lab{ color:var(--accent-dark); font-weight:700; }
@@ -131,6 +135,16 @@
 .skill .val{ flex:1 1 auto; min-width:0; text-align:justify; }
 .note{ margin-top:1pt; }
 .note .lab{ font-weight:700; }
+
+/* ---------- 划字上色（JSON 里的 [[wine|一段字]]）----------
+   写死的五个色值，和五套主题的主色同源，但**不跟着主题变**（见 render.js）。
+   必须排在所有组件规则后面：.bullet .lab 之类同样是两级选择器，
+   优先级打平时靠后者取胜，搬到前面去这里就压不住标签的颜色了。 */
+.paper .c-blue  { color:#1c5ab4; }
+.paper .c-ink   { color:#333333; }
+.paper .c-green { color:#17603f; }
+.paper .c-wine  { color:#8c1d2f; }
+.paper .c-indigo{ color:#43389e; }
 
 /* ============================================================
    打印：纸张的屏幕修饰全部去掉，交给 @page 控制真实页边距

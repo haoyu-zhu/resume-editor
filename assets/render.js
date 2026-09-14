@@ -53,10 +53,30 @@ function safeUrl(u) {
   return "https://" + s;
 }
 
-/** 字段值里唯一允许的内联标记：**加粗**。
-    先整体转义再认标记 —— 顺序反了就等于把 innerHTML 的口子开给了外来 JSON。
-    `[^*]+` 不跨越下一个星号，避免一行里两处加粗被贪婪地并成一处。 */
-const rich = (v) => esc(v).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+/** 划字上色能用的颜色，和侧栏五套主题的主色是同一组。
+    但这里是**写死的**，不跟着主题走：在深绿主题里把一句话标成酒红，换主题之后
+    它还得是酒红 —— 否则「我明明标了红」就成了玄学。 */
+const TEXT_COLORS = { blue: "#1c5ab4", ink: "#333333", green: "#17603f",
+                      wine: "#8c1d2f", indigo: "#43389e" };
+const COLOR_NAMES = { blue: "经典蓝", ink: "墨黑", green: "深绿",
+                      wine: "酒红", indigo: "靛紫" };
+const COLOR_KEYS  = Object.keys(TEXT_COLORS);
+const COLOR_RE    = new RegExp(`\\[\\[(${COLOR_KEYS.join("|")})\\|([^\\]]+)\\]\\]`, "g");
+
+/** 字段值里允许的内联标记，只有两种：
+
+      **一段字**        → 加粗
+      [[wine|一段字]]   → 上色，键名必须落在 TEXT_COLORS 白名单里
+
+    先整体转义、再认标记 —— 顺序反了就等于把 innerHTML 的口子开给了外来 JSON。
+    颜色只吐 class、不吐 style，白名单外的键名压根匹配不上、原样当普通文字留着，
+    所以别人发来的 resume.json 里塞什么都没有落脚点。
+
+    颜色排在加粗前面：两者可以套着用，先替颜色再替加粗，两种嵌套写法都能出来。
+    `[^*]+` / `[^\]]+` 都不跨越下一个定界符，免得一行里两处标记被贪婪地并成一处。 */
+const rich = (v) => esc(v)
+  .replace(COLOR_RE, '<span class="c-$1">$2</span>')
+  .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
 
 /** 可编辑叶子。tag 传 "a" 就渲染成链接 */
 const ed = (path, value, tag = "span", attrs = "") =>
@@ -91,18 +111,27 @@ function ctl(path, label, opts = {}) {
     b += `<button class="ctl-btn ctl-link" data-url="${esc(opts.url)}" `
        + `title="链接地址（留空即取消链接）">🔗</button>`;
   }
+  if (opts.plainOn) {
+    b += `<button class="ctl-btn ctl-plain" data-plain="${esc(path)}" data-mode="on" `
+       + `title="去掉前面的方块，当成一段概述写">¶</button>`;
+  }
   b += `<button class="ctl-btn ctl-del" data-del="${esc(path)}" title="删除${label}">✕</button>`;
   return b + `</span>`;
 }
 
-/** 左侧页边距里的「＋」，同样不参与布局。两种形态：
-    - 新增数组项：{ path: 数组路径, kind: 模板名, label, title }
-    - 补一个被删空的可选字段：{ set: 字段路径, val: 占位值, label, title } */
+/** 左侧页边距里的「＋」，同样不参与布局。几种形态：
+    - 新增数组项：  { path: 数组路径, kind: 模板名, label, title }
+    - 补一个被删空的可选字段：{ set: 字段路径, val: 占位值, label, title }
+    - 把板块图标请回来：      { iconFor: 板块路径, label, title }
+    - 把要点前面的方块请回来：{ plainOff: 要点路径, label, title } */
 function addbar(btns) {
   if (!btns || !btns.length) return "";
   return `<span class="addbar" contenteditable="false">`
     + btns.map(b => b.iconFor
         ? `<button class="ctl-btn ctl-add" data-icon="${esc(b.iconFor)}" `
+          + `title="${esc(b.title)}">${esc(b.label)}</button>`
+        : b.plainOff
+        ? `<button class="ctl-btn ctl-add" data-plain="${esc(b.plainOff)}" data-mode="off" `
           + `title="${esc(b.title)}">${esc(b.label)}</button>`
         : b.set
         ? `<button class="ctl-btn ctl-add" data-set="${esc(b.set)}" `
@@ -174,16 +203,30 @@ function header(data) {
   return h + `</div></div>`;
 }
 
+/** plain === true：这一条不画前面的方块，也不做悬挂缩进 —— 当成一段概述。
+    只认显式的 true；字段缺失仍然是普通要点，老 JSON 的行为一点不动。 */
+const isPlain = (b) => b.plain === true;
+
 function bullet(b, p) {
   let inner = "";
   if (b.label) inner += `<span class="lab">${ed(p + ".label", b.label)}：</span>`;
   inner += b.url
     ? edLink(p + ".text", b.text ?? b.url, b.url)
     : ed(p + ".text", b.text);
-  return `<div class="bullet" data-row="${esc(p)}"><span class="sq"></span>${inner}`
-    + addbar(b.label ? [] : [{ set: p + ".label", val: "标签", label: "＋标签",
-                              title: "给这条要点加一个蓝色标签" }])
-    + ctl(p, "这条要点", { drag: true, url: p + ".url" }) + `</div>`;
+
+  const plain = isPlain(b);
+  const adds = [];
+  if (!b.label) adds.push({ set: p + ".label", val: "标签", label: "＋标签",
+                            title: "给这条要点加一个蓝色标签" });
+  // 方块被去掉之后，在「＋」里给一个请回来的入口 —— 和板块的「＋图标」同一套路数
+  if (plain) adds.push({ plainOff: p, label: "＋方块",
+                         title: "把前面的方块加回来，变回一条要点" });
+
+  return `<div class="bullet${plain ? " plain" : ""}" data-row="${esc(p)}">`
+    + (plain ? `` : `<span class="sq"></span>`) + inner
+    + addbar(adds)
+    + ctl(p, plain ? "这一段" : "这条要点",
+          { drag: true, url: p + ".url", plainOn: !plain }) + `</div>`;
 }
 
 function section(s, i) {

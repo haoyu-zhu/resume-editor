@@ -308,6 +308,23 @@ function idlineWrap(path, mode) {
   return true;
 }
 
+/** 要点前面那个蓝方块的去留。mode "on" = 去掉（这一条改当概述段落写），
+    "off" = 加回来，变回一条普通要点。
+
+    加回来是**把字段整个删掉**，不是写 plain:false —— 导出的 JSON 要能回到
+    没有这个特性之前的样子，不然每条要点都拖着一个没用的 false。 */
+function setPlain(path, mode) {
+  const b = pathGet(state.data, path);
+  if (!b || typeof b !== "object") return false;
+  commitTextEdit();                  // 刚打的字单独占一档撤销
+  snapshot();
+  if (mode === "on") b.plain = true;
+  else delete b.plain;
+  paint();
+  focusPath(path + ".text");         // 光标留在原地，按钮跟着钉住不跑
+  return true;
+}
+
 /** 光标落在哪，就把哪一行（外加它外面一层）的按钮钉住。
     刻意**不在** focusout 里取消：一取消，鼠标按到按钮上的那一瞬间按钮就没了，
     click 事件根本发不出来 —— 这正是「移过去就点不到」的老毛病。
@@ -487,7 +504,9 @@ function applyTheme() {
   root.style.setProperty("--link", state.theme.link);
   const el = $("#theme-custom");
   if (el) el.value = state.theme.accent;
-  $$(".swatch").forEach(b => b.classList.toggle(
+  // 必须限定在 #swatches 里面 ——「文字」面板那排划字上色的色块用的也是 .swatch，
+  // 但它们带的是 data-color 不是 data-theme，扫进来就会 THEME_PRESETS[undefined] 炸掉
+  $$("#swatches .swatch").forEach(b => b.classList.toggle(
     "on", THEME_PRESETS[b.dataset.theme].accent.toLowerCase() === state.theme.accent.toLowerCase()));
   syncMeta();
   persist();
@@ -873,26 +892,93 @@ function applyBold() {
   document.execCommand("bold");
 }
 
-/** 把编辑框里的内容读回成字符串。<b>/<strong> 记成 **…**，其余标签一律拍平 ——
-    数据层永远只有纯文本加这一种标记，不存 HTML，外来 JSON 也就没有注入的余地。 */
+/** 给选中的字上色。key 传 "none" 就是去掉颜色。
+    和加粗同一条路：关掉 styleWithCSS 逼浏览器吐 <font color="#xxxxxx">（实测如此），
+    hex 原样保留，readField 就能照着白名单认回是哪一种颜色。
+    「去掉」用的是纯黑：它不在白名单里，readField 认不出来就把这层拍平了，
+    等于把标记删掉 —— 不用另外写一套解绑逻辑。 */
+function applyColor(key) {
+  if (!document.activeElement?.closest?.(".ed")) return;
+  const hex = key === "none" ? "#000000" : TEXT_COLORS[key];
+  if (!hex) return;
+  document.execCommand("styleWithCSS", false, false);
+  document.execCommand("foreColor", false, hex);
+}
+
+/** 加粗和色板都只在「光标正落在纸上某个字段里」时才可用 —— 没有选区，
+    点了也无处可施。两者状态永远一致，所以统一在这里开关。 */
+function setTextToolsEnabled(on) {
+  $("#btn-bold").disabled = !on;
+  $$("#text-colors .tc-swatch").forEach(b => { b.disabled = !on; });
+}
+
+/** "#8C1D2F" 和 "rgb(140, 29, 47)" 都归一成 "#8c1d2f"，认不出来给空串 */
+function normHex(s) {
+  const t = String(s || "").trim().toLowerCase();
+  const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(t);
+  if (m) return "#" + [1, 2, 3].map(i => Number(m[i]).toString(16).padStart(2, "0")).join("");
+  return /^#[0-9a-f]{6}$/.test(t) ? t : "";
+}
+
+/** 这个元素给它里面的字指定了什么颜色？三种回答，缺一不可：
+
+      键名   白名单里的颜色
+      ""     指定了颜色，但不在白名单里 —— 「去掉颜色」用的纯黑就走这一支，
+             视作「这里没有颜色」，从而把外层的颜色盖掉
+      null   压根没表态（<b>、普通 <span>）—— 沿用外层的颜色
+
+    认三种形态：重绘后的 <span class="c-wine">、execCommand 刚吐的 <font color>、
+    以及粘贴进来的 <span style="color:…">。 */
+function colorKeyOf(n) {
+  const cls = n.classList && COLOR_KEYS.find(k => n.classList.contains("c-" + k));
+  if (cls) return cls;
+  const raw = n.tagName.toLowerCase() === "font"
+    ? n.getAttribute("color")
+    : (n.style && n.style.color);
+  if (!raw) return null;
+  const hex = normHex(raw);
+  return COLOR_KEYS.find(k => TEXT_COLORS[k].toLowerCase() === hex) || "";
+}
+
+/** 把编辑框里的内容读回成字符串：加粗记成 **…**，白名单里的颜色记成 [[键名|…]]，
+    其余标签一律拍平 —— 数据层永远只有纯文本加这两种标记，不存 HTML，
+    外来 JSON 也就没有注入的余地。
+
+    **不能按 DOM 元素套标记**。重新上色时 execCommand 是往已有的元素里再包一层，
+    按元素套的话外层的旧颜色会罩住内层的新颜色 —— 结果就是颜色改不动、也去不掉。
+    所以先把内容拍成一串「文本 + 它当时的加粗/颜色状态」，里层覆盖外层，
+    再按状态分段吐标记。颜色在外、加粗在里，和 rich() 的嵌套顺序对上。 */
 function readField(el) {
-  let out = "";
-  const walk = (node, bold) => {
+  const runs = [];
+  const walk = (node, bold, color) => {
     for (const n of node.childNodes) {
-      if (n.nodeType === 3) { out += n.data; continue; }
+      if (n.nodeType === 3) { if (n.data) runs.push({ t: n.data, bold, color }); continue; }
       if (n.nodeType !== 1) continue;
       const tag = n.tagName.toLowerCase();
-      if (tag === "br") { continue; }                 // 回车本来就禁掉了，兜个底
-      const isB = !bold && (tag === "b" || tag === "strong");
-      if (!isB) { walk(n, bold); continue; }
-      const before = out.length;
-      out += "**";
-      walk(n, true);
-      if (out.length === before + 2) out = out.slice(0, before);  // 空的加粗，丢掉
-      else out += "**";
+      if (tag === "br") continue;                    // 回车本来就禁掉了，兜个底
+      const k = colorKeyOf(n);
+      walk(n, bold || tag === "b" || tag === "strong", k === null ? color : k);
     }
   };
-  walk(el, false);
+  walk(el, false, "");
+
+  let out = "", i = 0;
+  while (i < runs.length) {
+    const c = runs[i].color;
+    let j = i; while (j < runs.length && runs[j].color === c) j++;
+
+    let inner = "", a = i;
+    while (a < j) {
+      const b = runs[a].bold;
+      let z = a; while (z < j && runs[z].bold === b) z++;
+      const txt = runs.slice(a, z).map(r => r.t).join("");
+      inner += (b && txt.trim()) ? `**${txt}**` : txt;   // 空的加粗，丢掉
+      a = z;
+    }
+    // 正文里带 ] 的话标记会被 COLOR_RE 提前截断，宁可丢掉颜色也不吐一个坏标记
+    out += (c && inner && !inner.includes("]")) ? `[[${c}|${inner}]]` : inner;
+    i = j;
+  }
   return out;
 }
 
@@ -971,7 +1057,7 @@ function bind() {
   $("#doc").addEventListener("focusout", (e) => {
     if (e.target.closest(".ed")) {
       commitTextEdit({ repaint: true });   // 删空了可选字段，就在这一刻重画
-      $("#btn-bold").disabled = true;
+      setTextToolsEnabled(false);
     }
   });
   // 光标落到哪一行，就把那一行的按钮钉住（见 markActive 里为什么不在 focusout 取消）。
@@ -979,7 +1065,7 @@ function bind() {
   // 按钮在 mousedown 和 click 之间就被收走了，等于永远点不动。
   $("#doc").addEventListener("focusin", (e) => {
     if (e.target.closest(".ctl, .addbar")) return;
-    $("#btn-bold").disabled = !e.target.closest(".ed");
+    setTextToolsEnabled(!!e.target.closest(".ed"));
     markActive(e.target.closest(".ed"));
   });
 
@@ -1009,6 +1095,11 @@ function bind() {
   $("#doc").addEventListener("click", (e) => {
     const del = e.target.closest(".ctl-del");
     if (del) { snapshot(); pathDelete(state.data, del.dataset.del); paint(); return; }
+
+    // 去掉/加回要点前面的方块。这一支要排在 .ctl-add 前面 ——
+    // 「＋方块」那颗按钮同时也带 ctl-add 类，落到下面就会被当成「加一行」
+    const plain = e.target.closest("[data-plain]");
+    if (plain) { setPlain(plain.dataset.plain, plain.dataset.mode); return; }
 
     const add = e.target.closest(".ctl-add");
     if (add) {
@@ -1171,11 +1262,16 @@ function bind() {
   });
   $("#btn-zoom-fit").addEventListener("click", () => { state.zoomManual = false; fitZoom(); });
 
-  // ---- 加粗 ----
+  // ---- 加粗 / 划字上色 ----
   // 按钮一旦拿到焦点，纸上的选区就没了 —— 所以 mousedown 直接拦掉，
   // 焦点留在原地，execCommand 作用的还是刚才划选的那一段。
   $("#btn-bold").addEventListener("mousedown", (e) => e.preventDefault());
   $("#btn-bold").addEventListener("click", applyBold);
+  $("#text-colors").addEventListener("mousedown", (e) => e.preventDefault());
+  $("#text-colors").addEventListener("click", (e) => {
+    const sw = e.target.closest("[data-color]");
+    if (sw && !sw.disabled) applyColor(sw.dataset.color);
+  });
 
   // ---- 导出 ----
   $("#btn-json").addEventListener("click", downloadJson);
@@ -1324,6 +1420,14 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#swatches").innerHTML = Object.entries(THEME_PRESETS).map(([k, p]) =>
     `<button class="swatch" data-theme="${k}" title="${p.name}" `
     + `style="background:${p.accent}"></button>`).join("");
+  // 「文字」面板里的划字上色板。末尾那个 ✕ 是去掉颜色。
+  // 和加粗按钮一样，没光标在纸上时是灰的 —— 没有选区，点了也没有意义。
+  // 刻意**不**复用主题色板的 .swatch 类：那个类被 applyTheme 全局扫，
+  // 扫到没有 data-theme 的按钮就会炸。样式共用、类名分开，撞不了车。
+  $("#text-colors").innerHTML = COLOR_KEYS.map(k =>
+    `<button class="tc-swatch" data-color="${k}" title="${COLOR_NAMES[k]}" disabled `
+    + `style="background:${TEXT_COLORS[k]}"></button>`).join("")
+    + `<button class="tc-swatch tc-none" data-color="none" title="去掉颜色" disabled>✕</button>`;
   bind();
 
   // index.html#demo 强制开示例，绕开本地存档，方便发演示链接

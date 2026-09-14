@@ -96,12 +96,20 @@ kbd{
 
 /* ---------------- 主题色板 ---------------- */
 .swatches{ display:flex; gap:7px; margin-bottom:10px; }
-.swatch{
+.swatch, .tc-swatch{
   width:30px; height:30px; border-radius:6px; cursor:pointer;
   border:2px solid transparent; box-shadow:0 0 0 1px #d7dde6 inset;
 }
-.swatch:hover{ transform:translateY(-1px); }
+.swatch:hover, .tc-swatch:not(:disabled):hover{ transform:translateY(-1px); }
 .swatch.on{ border-color:#39424f; }
+/* 「文字」面板里划字上色的那排色块。类名和主题色板分开（见 app.js），
+   尺寸也小一号 —— 它是个偶尔用一下的动作，不该跟「主题色」这种全局设置抢分量 */
+.swatches.tc{ margin:8px 0 8px; }
+.tc-swatch{ width:24px; height:24px; border-radius:5px; }
+.tc-swatch:disabled{ opacity:.35; cursor:default; }
+/* 去掉颜色：白底一个 ✕，和上色的色块明显不是一类东西 */
+.tc-none{ background:#fff; color:#7b8595; font-size:12px; line-height:1;
+          display:grid; place-items:center; padding:0; }
 .row.slider b{ flex:0 0 38px; text-align:right; font-weight:600; color:#39424f;
                font-variant-numeric:tabular-nums; }
 
