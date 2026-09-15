@@ -293,12 +293,60 @@ dialog li{ margin-bottom:9px; }
 .checkline{ display:flex; align-items:center; gap:7px; font-size:12.5px;
             color:#5b6675; margin-top:14px; cursor:pointer; }
 
+/* ---------------- 浮在页面角上的两个按钮 ----------------
+   分享在右上，窄屏的侧栏开关在左上。都是 fixed，不参与布局，
+   z-index 要压过行右边的 .ctl（5）和拖拽时的浮层。 */
+.float-btn{
+  position:fixed; top:14px; z-index:30;
+  width:36px; height:36px; padding:0; display:grid; place-items:center;
+  background:#fff; color:#4a5666; border:1px solid #dfe3ea; border-radius:50%;
+  box-shadow:0 2px 10px rgba(20,30,50,.12); cursor:pointer;
+  transition:color .12s, border-color .12s, box-shadow .12s;
+}
+.float-btn:hover{ color:rgb(28,90,180); border-color:#b9c9e4;
+                  box-shadow:0 3px 14px rgba(20,30,50,.18); }
+/* 分享比侧栏开关大一号：它是要被看见的入口，不是收纳按钮 */
+#btn-share{ right:16px; width:72px; height:72px; }
+#btn-share svg{ width:36px; height:36px; }
+#nav-toggle{ left:16px; display:none; }        /* 宽屏不需要，侧栏一直在 */
+
+#nav-scrim{
+  position:fixed; inset:0; z-index:35; background:rgba(20,26,36,.4);
+  border:0; padding:0;
+}
+
+/* 分享按钮浮在视口右上角，纸是在 .stage 里居中的 —— 桌面窗口一窄，
+   纸的右上角就会钻到按钮底下，把「求职意向」那一块挡住点不着。
+   算出来的临界宽度是 1270px（纸 794 + 侧栏 300 + 两边留白 + 按钮）。
+   解法是给 .stage 右边留出按钮那么宽的空档，纸自己会跟着缩一点。
+   fitZoom 读的是真实内边距，所以这里改完它会自动跟上。 */
+@media (min-width:821px) and (max-width:1300px){
+  .stage{ padding-right:112px; }
+}
+
+/* ---------------- 分享弹窗 ---------------- */
+#share-box{ max-width:430px; }
+/* 高度写死、宽度由 aspect-ratio 推出来：src 是点开才填的，
+   不占位的话图一加载完对话框会当场蹿高一大截。用 vh 是为了矮屏幕上
+   下面的按钮也始终露在外面 —— 按钮比图重要。 */
+#share-img{
+  display:block; margin:0 auto; height:52vh; width:auto; max-width:100%;
+  aspect-ratio:1000/1357; object-fit:contain;
+  border-radius:8px; border:1px solid #e3e7ee; background:#eceff3;
+}
+.share-state{
+  margin:13px 0 0; font-size:13px; line-height:1.6; color:#2c6b3f;
+  min-height:2.6em;
+}
+.share-state.warn{ color:#8a5a12; }
+
 /* ============================================================
    打印：只留纸
    ============================================================ */
 @media print{
   body{ background:#fff; }
-  .sidebar, .empty, #probe, .ctl, .addbar, dialog, #sheets, #icon-pick, #tour{
+  .sidebar, .empty, #probe, .ctl, .addbar, dialog, #sheets, #icon-pick, #tour,
+  .float-btn, #nav-scrim{
     display:none !important;
   }
   /* 图标按钮本身要留着（它就是图标），只是不能带任何按钮的痕迹 */
@@ -357,4 +405,42 @@ body.tour-on{ overflow:hidden; }              /* 指引期间别让底下跟着�
 .tour-reveal > .ctl, .tour-reveal > .addbar,
 .tour-reveal > .sec-head > .addbar, .tour-reveal > .entry-head > .ctl{
   opacity:1 !important; visibility:visible !important; transition:none !important;
+}
+
+/* ============================================================
+   窄屏：侧栏收成抽屉
+   断点 820px 是算出来的 —— 再窄下去，300px 侧栏旁边剩给纸的宽度
+   就不到 520px（纸本身 794px），缩放掉到 65% 以下，不如让纸占满屏。
+
+   侧栏改成 position:fixed 而不是压缩宽度，是为了**桌面端一行不受影响**，
+   同时纸的可用宽度不随抽屉开合变化 —— fitZoom 不用跟着重算。
+   ============================================================ */
+@media (max-width:820px){
+  #nav-toggle{ display:grid; }
+
+  .sidebar{
+    position:fixed; left:0; top:0; bottom:0; z-index:40;
+    max-width:86vw; height:100vh;
+    transform:translateX(-100%); transition:transform .22s ease;
+    box-shadow:6px 0 30px rgba(20,30,50,.22);
+  }
+  body.nav-open .sidebar{ transform:none; }
+  body.nav-open{ overflow:hidden; }            /* 抽屉开着别让底下跟着滚 */
+
+  /* 抽屉一开，开关就被它盖住了，只剩右边那条窄缝能点遮罩关闭。
+     让它浮到抽屉右边当关闭键 —— 位置和抽屉边缘绑定，一眼知道关的是谁。 */
+  body.nav-open #nav-toggle{ left:calc(min(300px, 86vw) + 8px); z-index:45; }
+
+  .app{ display:block; }                        /* 侧栏已脱离文档流 */
+  /* 顶部留白要让开浮动按钮：分享 72px 从 top:10 起算，到 82 */
+  .stage{ padding:92px 8px 16px; min-height:100vh; }
+  .empty{ min-height:100vh; padding:92px 16px 16px; }
+
+  /* 两个浮动按钮在窄屏靠得更近边，给纸让位 */
+  .float-btn{ top:10px; }
+  #btn-share{ right:10px; }
+  #nav-toggle{ left:10px; }
+
+  #share-box{ max-width:calc(100vw - 32px); }
+  dialog{ padding:20px 18px; }
 }

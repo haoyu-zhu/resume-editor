@@ -13,6 +13,22 @@
 <!-- 用来把 cm 换算成 px，别删 -->
 <div id="probe"></div>
 
+<!-- 窄屏时把侧栏拉出来的按钮；宽屏 display:none。点遮罩或再点一次收回去 -->
+<button id="nav-toggle" class="float-btn" type="button" title="设置" aria-label="打开设置栏">
+  <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+</button>
+<div id="nav-scrim" hidden></div>
+
+<!-- 分享。放右上角是因为它是「被问到的时候才去找」的功能，不该占侧栏的位置 -->
+<button id="btn-share" class="float-btn" type="button" title="分享这个网站" aria-label="分享这个网站">
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/>
+    <path d="M8.3 10.7 15.7 6.3M8.3 13.3 15.7 17.7"/>
+  </svg>
+</button>
+
 <div class="app">
 
   <!-- ====================== 侧栏 ====================== -->
@@ -263,6 +279,20 @@
   <div class="btn-row end">
     <button class="btn" id="btn-print-cancel">取消</button>
     <button class="btn primary" id="btn-print-go">好，去打印</button>
+  </div>
+</dialog>
+
+<!-- ====================== 分享 ======================
+     图里印了二维码和网址，是因为剪贴板一次粘贴只能带图片**或**文字，
+     不能两个都要 —— 链接不长在图里的话，用户就得发两次。 -->
+<dialog id="share-box">
+  <h2>分享这个网站</h2>
+  <img id="share-img" width="1000" height="1357" alt="简历生成器做出来的简历长这样">
+  <p id="share-state" class="share-state"></p>
+  <div class="btn-row end">
+    <button class="btn" id="btn-share-close">关闭</button>
+    <button class="btn" id="btn-share-link">只复制链接</button>
+    <button class="btn primary" id="btn-share-img">复制图片</button>
   </div>
 </dialog>
 

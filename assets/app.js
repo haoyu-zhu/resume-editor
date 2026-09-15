@@ -1284,6 +1284,19 @@ function bind() {
   });
   $("#btn-print-cancel").addEventListener("click", () => $("#print-tips").close());
 
+  // ---- 分享 ----
+  $("#btn-share").addEventListener("click", openShare);
+  // 图 210KB，不能让每个访客都为一个多数人不点的功能付这份流量，所以懒加载。
+  // 但悬停到点击之间通常够它下完 —— 白赚一段提前量，不点的人一个字节都不花。
+  $("#btn-share").addEventListener("mouseenter", preloadShareImg, { once: true });
+  $("#btn-share-img").addEventListener("click", () => copyShareImage(true));
+  $("#btn-share-link").addEventListener("click", copyShareLink);
+  $("#btn-share-close").addEventListener("click", () => $("#share-box").close());
+
+  // ---- 窄屏的侧栏抽屉 ----
+  $("#nav-toggle").addEventListener("click", () => setNav(!document.body.classList.contains("nav-open")));
+  $("#nav-scrim").addEventListener("click", () => setNav(false));
+
   // ---- 全局快捷键 ----
   document.addEventListener("keydown", onKey);
   document.addEventListener("click", (e) => {
@@ -1339,6 +1352,7 @@ function onKey(e) {
 
   // Esc：收起钉住的按钮，光标也退出来。图标选择器开着就先关它
   if (e.key === "Escape") {
+    if (document.body.classList.contains("nav-open")) { setNav(false); return; }
     if (!$("#icon-pick").hidden) { closeIconPicker(); return; }
     markActive(null);
     if (inField) document.activeElement.blur();
@@ -1399,6 +1413,103 @@ function askPrint() {
   $("#print-tips").showModal();
 }
 
+/* ============================== 分享 ==============================
+   分享的是**这个网站**，不是用户的简历 —— 简历上有手机号和住址，
+   没人会往群里发，做成一键分享只会变成误发的地雷。
+
+   形式是「一张图 + 图里印着二维码和网址」。之所以必须把链接印进图里：
+   剪贴板一次粘贴只能拿到图片**或**文字，不能两个都要（ClipboardItem 里
+   放多个 MIME 是同一份内容的备选表示，接收方只挑一种），微信会挑图片。
+   链接不在图里的话，用户得发两次。
+
+   图 210KB，比其余所有文件加起来还大，所以 <img> 的 src 是点开才填的，
+   别让它拖慢首屏。
+   ================================================================= */
+const SHARE_IMG  = "assets/share.png";
+const SHARE_URL  = "https://haoyu-zhu.github.io/resume-editor/";
+const SHARE_TEXT = "在浏览器里直接改的简历工具，所见即所得，不用注册，简历不上传。\n" + SHARE_URL;
+
+const canCopyImage = () =>
+  !!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write);
+
+function shareSay(msg, warn) {
+  const el = $("#share-state");
+  el.textContent = msg;
+  el.classList.toggle("warn", !!warn);
+}
+
+function preloadShareImg() {
+  const img = $("#share-img");
+  if (!img.getAttribute("src")) img.src = SHARE_IMG;
+}
+
+function openShare() {
+  preloadShareImg();
+  $("#share-box").showModal();
+
+  // 手机上不走剪贴板：长按图片是系统原生菜单，比 JS 可靠得多，
+  // 而且微信内置浏览器的剪贴板支持本来就指望不上。
+  const touch = matchMedia("(max-width:820px)").matches;
+  $("#btn-share-img").hidden = touch || !canCopyImage();
+  if (touch) { shareSay("长按上面的图片保存，发到微信就行。图里有二维码，对方长按能直接识别。"); return; }
+  if (!canCopyImage()) {
+    shareSay("这个浏览器不支持直接复制图片 —— 在图上点右键选「复制图片」，或者用下面的「只复制链接」。", true);
+    return;
+  }
+  copyShareImage(false);   // 打开就复制好，省掉一次点击
+}
+
+/** 复制分享图。manual=true 是用户自己点的「复制图片」，文案不一样。 */
+async function copyShareImage(manual) {
+  shareSay("正在复制图片…");   // 写剪贴板是异步的，空着一格会像卡住
+  try {
+    // 要害：把 fetch 的 Promise 直接交给 ClipboardItem，不要先 await 再 write。
+    // await 会让 Safari 认为用户手势已经过期，整个写入被拒。
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": fetch(SHARE_IMG).then((r) => r.blob()) }),
+    ]);
+    shareSay("✓ 图片已复制，去微信粘贴发送就行。图里有二维码，对方长按能直接识别。");
+    $("#btn-share-img").textContent = "再复制一次";
+  } catch (e) {
+    shareSay(manual
+      ? "复制没成功 —— 在图上点右键选「复制图片」，或者用「只复制链接」。"
+      : "点右边的「复制图片」，或者在图上点右键选「复制图片」。", true);
+  }
+}
+
+async function copyShareLink() {
+  const ok = await writeText(SHARE_TEXT);
+  shareSay(ok ? "✓ 链接和一句话说明已复制。"
+              : "复制没成功，手动选中下面这行复制：\n" + SHARE_URL, !ok);
+}
+
+/** 写文字到剪贴板。file:// 下 navigator.clipboard 不可用，退回老办法。 */
+async function writeText(s) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(s);
+      return true;
+    }
+  } catch (e) { /* 掉到下面的兜底 */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = s;
+    ta.style.cssText = "position:fixed;top:-100px;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (e) { return false; }
+}
+
+/* ---- 窄屏侧栏抽屉 ----
+   侧栏在窄屏是 position:fixed，纸的可用宽度不随开合变化，所以不用重算 fitZoom。 */
+function setNav(on) {
+  document.body.classList.toggle("nav-open", on);
+  $("#nav-scrim").hidden = !on;
+}
+
 /* ============================== 缩放 ============================== */
 function setZoom(z) {
   state.zoom = z;
@@ -1410,7 +1521,10 @@ function setZoom(z) {
 function fitZoom() {
   const stage = $("#stage");
   if (!stage || stage.hidden || state.zoomManual) return;
-  const avail = stage.clientWidth - 48;
+  // 读真实的左右内边距，别写死 48 —— 窄桌面上 .stage 的右边会加宽，
+  // 给右上角那个浮动的分享按钮让位；写死的话纸会照旧压到按钮底下去。
+  const cs = getComputedStyle(stage);
+  const avail = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   setZoom(clamp(avail / cmToPx(21), 0.4, 1));
 }
 
