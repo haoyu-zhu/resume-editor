@@ -319,8 +319,9 @@ dialog li{ margin-bottom:9px; }
    纸的右上角就会钻到按钮底下，把「求职意向」那一块挡住点不着。
    算出来的临界宽度是 1270px（纸 794 + 侧栏 300 + 两边留白 + 按钮）。
    解法是给 .stage 右边留出按钮那么宽的空档，纸自己会跟着缩一点。
-   fitZoom 读的是真实内边距，所以这里改完它会自动跟上。 */
-@media (min-width:821px) and (max-width:1300px){
+   fitZoom 读的是真实内边距，所以这里改完它会自动跟上。
+   screen 不能省，理由见下面窄屏那段（横向打印时纸宽 29.7cm 会落进这个区间）。 */
+@media screen and (min-width:821px) and (max-width:1300px){
   .stage{ padding-right:112px; }
 }
 
@@ -414,8 +415,14 @@ body.tour-on{ overflow:hidden; }              /* 指引期间别让底下跟着�
 
    侧栏改成 position:fixed 而不是压缩宽度，是为了**桌面端一行不受影响**，
    同时纸的可用宽度不随抽屉开合变化 —— fitZoom 不用跟着重算。
+
+   **必须写 screen**：打印时 max-width 量的是纸面宽度，A4 减去左右页边距
+   只有 19cm 上下（≈720-750px），永远 < 820px，于是这一整段在打印时也生效。
+   它又排在 @media print 后面，同优先级后者赢 —— .stage 的 92px 上留白和
+   两侧 8px 就盖掉了 print 里的 padding:0，导出的 PDF 顶上空一大截、
+   内容变窄被挤成两页。
    ============================================================ */
-@media (max-width:820px){
+@media screen and (max-width:820px){
   #nav-toggle{ display:grid; }
 
   .sidebar{
