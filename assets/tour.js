@@ -105,7 +105,7 @@
     document.body.appendChild(root);
     $("#tour-next").addEventListener("click", () => go(idx + 1));
     $("#tour-prev").addEventListener("click", () => go(idx - 1));
-    $("#tour-skip").addEventListener("click", stop);
+    $("#tour-skip").addEventListener("click", () => stop("skip"));
     document.addEventListener("keydown", onKey, true);
     addEventListener("resize", relayout);
   }
@@ -115,7 +115,7 @@
     const k = e.key;
     if (k !== "Escape" && k !== "ArrowRight" && k !== "ArrowLeft" && k !== "Enter") return;
     e.preventDefault(); e.stopPropagation();          // 别漏到编辑器的快捷键上
-    if (k === "Escape") stop();
+    if (k === "Escape") stop("skip");
     else if (k === "ArrowLeft") go(idx - 1);
     else go(idx + 1);
   }
@@ -240,7 +240,7 @@
 
   function go(i) {
     if (i < 0) return;
-    if (i >= STEPS.length) return stop();
+    if (i >= STEPS.length) return stop("done");
     clearReveal();
     idx = i;
     const step = STEPS[idx];
@@ -276,7 +276,8 @@
     go(0);
   }
 
-  function stop() {
+  /** outcome: "done" 走完全程 / "skip" 中途退出 / 不传则不上报（重启时的内部调用） */
+  function stop(outcome) {
     clearReveal();
     document.removeEventListener("keydown", onKey, true);
     removeEventListener("resize", relayout);
@@ -284,6 +285,8 @@
     root = null;
     document.body.classList.remove("tour-on");
     try { localStorage.setItem(LS_TOUR, "1"); } catch (e) { /* 存不下就每次都自动跑，认了 */ }
+    // 走到最后一步才算「跑完」，中途关掉记成退出 —— 这两个数放一起才看得出引导有没有用
+    if (outcome) window.track?.(outcome === "done" ? "tour_done" : "tour_skip");
   }
 
   window.startTour = start;

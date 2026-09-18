@@ -661,6 +661,7 @@ function measure() {
   if (!doc || !state.data) return;
   fitRow3Columns();                 // 必须在 paginate 之前 —— 它会改行宽，进而改行高
   const { pages, lastFill, pageH, gap } = paginate();
+  window.trackShape?.(pages, (state.data.sections || []).length);
   drawSheets(pages, pageH, gap);
 
   const target = state.targetPages;                 // 0 = 不限
@@ -736,7 +737,7 @@ function normalizePhoto(obj) {
   }
 }
 
-function loadData(obj, { keepVars = false, transient = false } = {}) {
+function loadData(obj, { keepVars = false, transient = false, source = "" } = {}) {
   normalizePhoto(obj);
   state.transient = transient;
   state.unsaved = false;
@@ -755,6 +756,8 @@ function loadData(obj, { keepVars = false, transient = false } = {}) {
   setTitle();
   state.zoomManual = false;
   fitZoom();
+  // 只报「以什么方式打开的」这一个枚举值，不带任何简历内容
+  if (source) window.track?.("open", { s: source });
 }
 
 /** 存 PDF 时的默认文件名。浏览器拿的是 document.title，而平时的标题
@@ -783,7 +786,7 @@ function readJsonFile(file) {
     try {
       const obj = JSON.parse(r.result);
       if (!obj.basics || !obj.sections) throw new Error("不像是简历 JSON（缺 basics 或 sections）");
-      loadData(obj);
+      loadData(obj, { source: "json" });
     } catch (e) {
       alert("读不了这个文件：" + e.message);
     }
@@ -809,6 +812,7 @@ function downloadJson() {
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
+  window.track?.("download");
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   state.unsaved = false;
   $("#btn-json")?.classList.remove("dirty");
@@ -1024,15 +1028,15 @@ function bind() {
   $("#btn-paste").addEventListener("click", () => {
     const t = prompt("把 resume.json 的内容整段粘贴进来：");
     if (!t) return;
-    try { loadData(JSON.parse(t)); } catch (e) { alert("JSON 解析失败：" + e.message); }
+    try { loadData(JSON.parse(t), { source: "paste" }); } catch (e) { alert("JSON 解析失败：" + e.message); }
   });
   $("#btn-sample").addEventListener("click", () => {
-    if (window.SAMPLE) loadData(clone(window.SAMPLE));
+    if (window.SAMPLE) loadData(clone(window.SAMPLE), { source: "sample" });
     else alert("示例没加载上，检查 assets/sample.js 是否和网页放在一起。");
   });
   $("#btn-blank").addEventListener("click", () => {
     if (state.data && !confirm("新建一份空白简历？当前内容会被替换。")) return;
-    loadData(blankResume());
+    loadData(blankResume(), { source: "blank" });
     focusPath("basics.name");
   });
 
@@ -1280,6 +1284,7 @@ function bind() {
   $("#btn-print-go").addEventListener("click", () => {
     if ($("#skip-tips").checked) localStorage.setItem(LS_TIPS, "1");
     $("#print-tips").close();
+    window.track?.("print");
     setTimeout(() => window.print(), 60);
   });
   $("#btn-print-cancel").addEventListener("click", () => $("#print-tips").close());
@@ -1398,7 +1403,7 @@ function askPrint() {
   // 勾过「以后别再提示我」的人平时直接打印。但这次的留白确实会招来页眉页脚的话，
   // 还是要拦一下 —— 「先勾了不再提示，几周后才想起来调留白」是很常见的顺序，
   // 不拦的话这批人一点提醒都收不到。
-  if (skipped && !risky) { window.print(); return; }
+  if (skipped && !risky) { window.track?.("print"); window.print(); return; }
 
   // 越界补弹的那一次只亮相关的那一条，别把三件套又整个摆一遍
   const only = skipped;
@@ -1545,15 +1550,17 @@ window.addEventListener("DOMContentLoaded", () => {
   bind();
 
   // index.html#demo 强制开示例，绕开本地存档，方便发演示链接
-  if (location.hash === "#demo" && window.SAMPLE) { loadData(clone(window.SAMPLE)); return; }
+  if (location.hash === "#demo" && window.SAMPLE) { loadData(clone(window.SAMPLE), { source: "demo" }); return; }
   // 恢复上次没改完的
   let restored = false;
+  let opened = false;   // 这次启动到底有没有报过 open，见本函数末尾
   try {
     const d = localStorage.getItem(LS_DATA);
     if (d) {
       const obj = JSON.parse(d);
-      loadData(obj);
+      loadData(obj, { source: "restore" });
       restored = true;
+      opened = true;
       const v = localStorage.getItem(LS_VARS);
       const th = localStorage.getItem(LS_THEME);
       if (v) { state.vars = { ...state.vars, ...JSON.parse(v) }; applyVars(); }
@@ -1576,8 +1583,12 @@ window.addEventListener("DOMContentLoaded", () => {
     let seen = true;
     try { seen = localStorage.getItem(LS_SEEN) === "1"; } catch (e) { seen = false; }
     if (!seen) {
-      loadData(clone(window.SAMPLE), { transient: true });
+      loadData(clone(window.SAMPLE), { transient: true, source: "first" });
       try { localStorage.setItem(LS_SEEN, "1"); } catch (e) { /* 存不下就算了 */ }
+      opened = true;
     }
   }
+  // 回头客、又没留下草稿，纸上就是空的 —— 这也是一种「打开」，必须记一笔，
+  // 否则漏斗的分母只剩下有草稿的人，转化率会被算得虚高。
+  if (!opened) window.track?.("open", { s: "empty" });
 });

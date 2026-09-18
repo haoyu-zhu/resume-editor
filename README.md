@@ -22,8 +22,8 @@
 
 - **纯静态**，没有构建步骤，没有后端。丢到任何静态托管上就能跑。
 - **简历不出浏览器。** 简历文字和照片全程只在本机的内存和 localStorage 里，从不发往任何服务器。
-  （官方站点接了 Cloudflare Web Analytics，只统计访问量，无 Cookie、不做用户画像，也碰不到简历内容；
-  自己部署的话把 `index.html` 末尾那段 beacon 删掉或换成自己的 token。）
+  官方站点有匿名使用统计，但它只数数和计时，碰不到简历内容 —— 逐字段清单见
+  [统计了什么](#统计了什么)。
 - **所见即所得。** 屏幕上那张纸的尺寸、字号、间距就是打印出来的 A4，没有二次转换。
 - **一页一张纸。** 内容多了自动排到下一张，跨页的整段经历会被整块推下去，不会被切成两半。屏幕上排到第几页，打印出来就是第几页。
 - **实时告诉你排满了没有。** 设一个目标页数，超了才报红。
@@ -99,14 +99,65 @@
 链接不在图里的话，用户得发两次。
 
 二维码和「只复制链接」都指向主页。**代价是数不出分享带来了多少人** ——
-Cloudflare Web Analytics 没有自定义事件，Paths 面板只按路径分组，
-想单独统计就得给分享链接一个自己的路径（比如 `/s/` 停一下再跳回主页）。
+统计里虽然有来路域名，但从微信、二维码、以及图里那行网址点进来的都没有来路，
+恰好就是分享的主要路径。想数准就得给分享链接一个自己的路径（比如 `/s/` 停一下再跳回主页）。
 现在的量级下那个数每天是个位数噪声，不值得为它多一个页面和一次跳转。
 
 换图：改 `tools/make-share.py` 顶上的构图参数，跑 `python tools/make-share.py`。
 它重新渲染一遍示例简历，所以**改了版面样式重跑一次就同步了**，不会和产品脱节。
 
 分享的是**这个网站**，不是用户的简历 —— 简历上有手机号和住址，做成一键分享只会变成误发的地雷。
+
+---
+
+## 统计了什么
+
+官方站点 `haoyu-zhu.github.io/resume-editor/` 有两处匿名统计。
+自己部署的话，删掉 `index.html` 末尾那段 beacon、并把 `assets/metrics.js`
+里的 `ENDPOINT` 留空，两处就都关了。
+
+**这里不存在「我们只是不看」的说法。** 下面每个字段都是白名单里写死的，
+接收端（`analytics/src/index.js`）没有能装下姓名、电话、邮箱或经历正文的地方 ——
+不在名单里的字段在入库之前就被丢了。
+
+### 1. Cloudflare Web Analytics
+
+访问量、页面加载耗时、来路。无 Cookie，不做用户画像。这是 Cloudflare 的现成服务。
+
+### 2. 自建埋点（`analytics/`，源码在同一个仓库里）
+
+回答两个问题：**有多少人真的做出了一份简历**，以及**他们在这儿待了多久**。
+Cloudflare Web Analytics 两个都答不了 —— 它没有自定义事件，也无法把同一次访问的动作串起来。
+
+发生这些事的时候各发一条：
+
+| 事件 | 什么时候 |
+|---|---|
+| `open` | 页面载入完成，带上是以什么方式打开的 |
+| `print` | 点了打印 |
+| `download` | 下载了 `.json` |
+| `tour_done` / `tour_skip` | 新手指引走完 / 中途退出 |
+| `leave` | 标签页转入后台或关闭，结算这一段的有效停留时长 |
+
+每条里带的**全部**字段：
+
+| 字段 | 值 | 说明 |
+|---|---|---|
+| 事件名 | 上表七选一 | 不在表里的请求直接 400 |
+| 打开方式 | `first` / `empty` / `restore` / `blank` / `sample` / `json` / `paste` / `demo` | 枚举，不在表里记成 `other` |
+| 有效停留秒数 | 0–10800 | 只累计**标签页可见**的时间；超 3 小时判为异常丢弃 |
+| 页数 | 0–50 | 简历排了几页，是个数字 |
+| 板块数 | 0–200 | 简历有几个板块，是个数字 |
+| 来路域名 | 如 `www.google.com` | **只取域名**，路径和 query 在入库前被削掉 |
+| 设备 | `mobile` / `desktop` | 视口是否 ≤820px |
+| 国家 | 如 `CN` | Cloudflare 边缘本来就知道，**IP 一个字节都不落** |
+| 前端版本 | 如 `2026-09` | 区分改版前后的数据 |
+| 会话串 | 随机 UUID | 存在 `sessionStorage`，**关掉标签页就失效**，跨访问认不出同一个人 |
+| 时间戳 | 服务端时间 | 不信客户端的表 |
+
+没有的东西：**Cookie、跨访问的持久标识、IP、简历里的任何一个字**。
+
+想自己看数：`python analytics/report.py --days 30`（需要先 `npx wrangler login`）。
 
 ---
 
@@ -140,12 +191,14 @@ assets/render.js    JSON -> DOM
 assets/app.js       编辑逻辑：改字回写、增删、拖拽、撤销、分页、版面变量、导出
 assets/tour.js      新手指引（步骤表 + 气泡摆位 + 打圈箭头，自成一支）
 assets/sample.js    示例简历，也是首次打开时纸上的默认内容
+assets/metrics.js   匿名使用统计的前端（ENDPOINT 留空就整个关掉）
 assets/photo.js     默认占位证件照（data URI，由 tools/make-photo.py 生成）
 assets/icon.png     标签页图标（由 tools/make-icon.py 生成）
 Fig/                上面两个的原图，产品运行时不读它
 assets/share.png    分享弹窗里那张图（由 tools/make-share.py 生成）
 tools/serve.py      本地预览服务器（带禁缓存头，改完刷新就见效）
 tools/make-share.py 重做 assets/share.png（真实渲染示例简历 + 横幅 + 二维码）
+analytics/          埋点接收端（Cloudflare Worker + D1）与报表脚本，自己部署可以整个删掉
 ```
 
 **改版面样式只改 `assets/resume.css` 的 `:root` 变量**，不要在 `render.js` 生成的 HTML 里写死尺寸——那会让预览和打印对不上。
@@ -153,6 +206,12 @@ tools/make-share.py 重做 assets/share.png（真实渲染示例简历 + 横幅 
 **本地预览**：`python tools/serve.py` → <http://localhost:8765/>。比 `python -m http.server` 多做一件事：每个响应都带禁用缓存的头，否则改了文件刷新也看不到变化。
 
 **换占位证件照 / 标签页图标**：新图放进 `Fig/`，跑 `python tools/make-photo.py` 或 `python tools/make-icon.py`。产品本身仍然零构建步骤，这两个脚本只在换图时才用。
+
+**关掉统计**：`assets/metrics.js` 顶上的 `ENDPOINT` 留空 + 删掉 `index.html` 末尾那段
+Cloudflare beacon。想接自己的：`cd analytics && npx wrangler d1 create ...`，把
+`wrangler.jsonc` 里的 `database_id` 换成自己的，`npx wrangler d1 execute <库> --remote
+--file migrations/0001_init.sql` 建表，`npx wrangler deploy`，再把 `src/index.js` 里的
+`ALLOWED_ORIGINS` 换成自己的域名。**改那个文件之前先读它开头的三条铁律。**
 
 **部署**：推到 GitHub，仓库 Settings → Pages → Source 选 Deploy from a branch，Branch 选 main / (root)。换任何静态托管都一样，把这些文件原样放上去即可。带 `#demo` 的链接会绕开访客的本地存档强制载入示例，适合发出去给人看效果。
 

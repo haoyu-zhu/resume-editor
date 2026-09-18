@@ -1,0 +1,25 @@
+{
+  // 简历生成器的埋点接收端。前端 assets/metrics.js 往这里发 beacon。
+  // 部署：cd analytics && npx wrangler deploy
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "resume-editor-analytics",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+
+  // 存储用 D1。本来想用 Analytics Engine（更便宜、自带聚合），但它需要在
+  // 控制台做一次账户级开关，没开之前 deploy 会被 10089 挡住。
+  // Worker 里两条路都留着：哪个 binding 存在就写哪个，开关开了之后
+  // 把下面那段 analytics_engine_datasets 放开就能平滑切过去，代码一行不用改。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "resume-editor-analytics",
+      "database_id": "74ae51a3-9778-4067-b19e-46c696a87690"
+    }
+  ]
+
+  // ,"analytics_engine_datasets": [
+  //   { "binding": "AE", "dataset": "resume_editor_events" }
+  // ]
+}

@@ -3,3 +3,7 @@ Thumbs.db
 _test.html
 _diag.html
 _backup/
+
+# wrangler 的本地状态和缓存，别进仓库
+.wrangler/
+node_modules/
