@@ -1298,6 +1298,31 @@ function bind() {
   $("#btn-share-link").addEventListener("click", copyShareLink);
   $("#btn-share-close").addEventListener("click", () => $("#share-box").close());
 
+  // ---- 右下角「其他求职工具」----
+  // 展开靠 CSS 的 :hover / :focus-within，这里只管触屏：手指没有悬停，
+  // 点一下切换 .open；点别处或按 Esc 收起。菜单里的链接不算「点别处」。
+  const fab = $("#tools-fab");
+  $("#tools-btn").addEventListener("click", () => {
+    const on = !fab.classList.contains("open");
+    fab.classList.toggle("open", on);
+    $("#tools-btn").setAttribute("aria-expanded", String(on));
+  });
+  document.addEventListener("click", (e) => {
+    if (!fab.contains(e.target)) {
+      fab.classList.remove("open");
+      $("#tools-btn").setAttribute("aria-expanded", "false");
+    }
+  });
+  $("#tools-menu").addEventListener("click", (e) => {
+    if (e.target.closest("a")) window.track?.("tool-out");
+  });
+  // 不走 onKey：那个函数开头就 `if (!state.data) return`，空白页上收不起来
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !fab.classList.contains("open")) return;
+    fab.classList.remove("open");
+    $("#tools-btn").setAttribute("aria-expanded", "false");
+  });
+
   // ---- 窄屏的侧栏抽屉 ----
   $("#nav-toggle").addEventListener("click", () => setNav(!document.body.classList.contains("nav-open")));
   $("#nav-scrim").addEventListener("click", () => setNav(false));

@@ -293,8 +293,8 @@ dialog li{ margin-bottom:9px; }
 .checkline{ display:flex; align-items:center; gap:7px; font-size:12.5px;
             color:#5b6675; margin-top:14px; cursor:pointer; }
 
-/* ---------------- 浮在页面角上的两个按钮 ----------------
-   分享在右上，窄屏的侧栏开关在左上。都是 fixed，不参与布局，
+/* ---------------- 浮在页面角上的按钮 ----------------
+   右上角是「源码 + 分享」，窄屏的侧栏开关在左上。都是 fixed，不参与布局，
    z-index 要压过行右边的 .ctl（5）和拖拽时的浮层。 */
 .float-btn{
   position:fixed; top:14px; z-index:30;
@@ -305,24 +305,73 @@ dialog li{ margin-bottom:9px; }
 }
 .float-btn:hover{ color:rgb(28,90,180); border-color:#b9c9e4;
                   box-shadow:0 3px 14px rgba(20,30,50,.18); }
-/* 分享比侧栏开关大一号：它是要被看见的入口，不是收纳按钮 */
-#btn-share{ right:16px; width:72px; height:72px; }
-#btn-share svg{ width:36px; height:36px; }
+/* 右上角那一簇：容器负责定位，两个按钮回到文档流里由 flex 摆，
+   谁大谁小都自动垂直居中 —— 改尺寸不用再手算 top。 */
+.float-right{
+  position:fixed; top:14px; right:16px; z-index:30;
+  display:flex; align-items:center; gap:10px;
+}
+/* 右上角这两个是同一类东西（都是「关于这个网站」的出口），
+   一样大才像一组；比左上角的侧栏开关大一号，那个是收纳按钮 */
+.float-right .float-btn{ position:static; width:54px; height:54px; }
+.float-right .float-btn svg{ width:27px; height:27px; }
 #nav-toggle{ left:16px; display:none; }        /* 宽屏不需要，侧栏一直在 */
+
+/* ---------------- 右下角：其他求职工具 ----------------
+   悬停（或点击）上拉一个菜单。菜单和按钮之间**不能用 margin 拉开**，
+   否则鼠标从按钮挪向菜单时会穿过一条没有元素的死缝，菜单当场收起；
+   空隙用菜单自己的 padding-bottom 撑，hover 区域就是连着的。 */
+.tools-fab{ position:fixed; right:16px; bottom:16px; z-index:30; }
+
+.tools-btn{
+  display:flex; align-items:center; gap:5px;
+  padding:8px 13px; font-size:12.5px; font-family:inherit; color:#4a5666;
+  background:#fff; border:1px solid #dfe3ea; border-radius:999px;
+  box-shadow:0 2px 10px rgba(20,30,50,.12); cursor:pointer;
+  transition:color .12s, border-color .12s, box-shadow .12s;
+}
+.tools-btn:hover, .tools-fab.open .tools-btn{
+  color:rgb(28,90,180); border-color:#b9c9e4; box-shadow:0 3px 14px rgba(20,30,50,.18);
+}
+.tools-btn svg{ transition:transform .18s; }
+.tools-fab:hover .tools-btn svg, .tools-fab.open .tools-btn svg{ transform:rotate(180deg); }
+
+.tools-menu{
+  position:absolute; right:0; bottom:100%; padding-bottom:8px;
+  opacity:0; visibility:hidden; transform:translateY(6px);
+  transition:opacity .16s, transform .16s, visibility .16s;
+}
+.tools-fab:hover .tools-menu,
+.tools-fab:focus-within .tools-menu,
+.tools-fab.open .tools-menu{ opacity:1; visibility:visible; transform:none; }
+
+.tools-item{
+  display:flex; align-items:center; gap:10px; width:258px;
+  padding:11px 13px; text-decoration:none; color:inherit;
+  background:#fff; border:1px solid #dfe3ea; border-radius:10px;
+  box-shadow:0 8px 26px rgba(20,30,50,.16);
+}
+.tools-item:hover{ border-color:#b9c9e4; background:#f7faff; }
+.tools-ico{ font-size:20px; line-height:1; }
+.tools-txt{ display:block; }
+.tools-txt b{ display:block; font-size:13px; color:#2b3444; }
+.tools-txt small{ display:block; margin-top:2px; font-size:11.5px; color:#8a94a3; line-height:1.5; }
 
 #nav-scrim{
   position:fixed; inset:0; z-index:35; background:rgba(20,26,36,.4);
   border:0; padding:0;
 }
 
-/* 分享按钮浮在视口右上角，纸是在 .stage 里居中的 —— 桌面窗口一窄，
-   纸的右上角就会钻到按钮底下，把「求职意向」那一块挡住点不着。
-   算出来的临界宽度是 1270px（纸 794 + 侧栏 300 + 两边留白 + 按钮）。
-   解法是给 .stage 右边留出按钮那么宽的空档，纸自己会跟着缩一点。
-   fitZoom 读的是真实内边距，所以这里改完它会自动跟上。
+/* 右边缘浮着三样东西（GitHub、分享、其他求职工具），纸是在 .stage 里居中的 ——
+   桌面窗口一窄，纸的右边就会钻到它们底下，把「求职意向」那一块挡住点不着。
+   解法是给 .stage 右边留出它们那么宽的空档，纸自己会跟着缩一点。
+   宽度按最宽的那个算：右下角的胶囊约 124px，加 16px 边距和 8px 余量 = 148。
+   断点 1390 是解出来的：右边自然余量 (视口-300-48-794)/2+24 ≥ 148。
+   fitZoom 读的是真实内边距，所以这里改完它会自动跟上；1366 宽的笔记本上
+   纸还有 894px 可用，不触发缩放。
    screen 不能省，理由见下面窄屏那段（横向打印时纸宽 29.7cm 会落进这个区间）。 */
-@media screen and (min-width:821px) and (max-width:1300px){
-  .stage{ padding-right:112px; }
+@media screen and (min-width:821px) and (max-width:1390px){
+  .stage{ padding-right:148px; }
 }
 
 /* ---------------- 分享弹窗 ---------------- */
@@ -347,7 +396,7 @@ dialog li{ margin-bottom:9px; }
 @media print{
   body{ background:#fff; }
   .sidebar, .empty, #probe, .ctl, .addbar, dialog, #sheets, #icon-pick, #tour,
-  .float-btn, #nav-scrim{
+  .float-btn, .float-right, .tools-fab, #nav-scrim{
     display:none !important;
   }
   /* 图标按钮本身要留着（它就是图标），只是不能带任何按钮的痕迹 */
@@ -439,14 +488,20 @@ body.tour-on{ overflow:hidden; }              /* 指引期间别让底下跟着�
   body.nav-open #nav-toggle{ left:calc(min(300px, 86vw) + 8px); z-index:45; }
 
   .app{ display:block; }                        /* 侧栏已脱离文档流 */
-  /* 顶部留白要让开浮动按钮：分享 72px 从 top:10 起算，到 82 */
-  .stage{ padding:92px 8px 16px; min-height:100vh; }
-  .empty{ min-height:100vh; padding:92px 16px 16px; }
+  /* 顶部留白要让开浮动按钮：分享 54px 从 top:10 起算，到 64，再留 10 */
+  .stage{ padding:74px 8px 16px; min-height:100vh; }
+  .empty{ min-height:100vh; padding:74px 16px 16px; }
 
-  /* 两个浮动按钮在窄屏靠得更近边，给纸让位 */
+  /* 浮动按钮在窄屏靠得更近边，给纸让位 */
   .float-btn{ top:10px; }
-  #btn-share{ right:10px; }
+  .float-right{ top:10px; right:10px; gap:8px; }
   #nav-toggle{ left:10px; }
+
+  /* 窄屏上手指没有 hover，菜单靠点击开合（见 app.js）；
+     胶囊缩一圈，免得压住纸上太多字 */
+  .tools-fab{ right:10px; bottom:10px; }
+  .tools-btn{ padding:7px 11px; font-size:12px; }
+  .tools-item{ width:min(258px, calc(100vw - 32px)); }
 
   #share-box{ max-width:calc(100vw - 32px); }
   dialog{ padding:20px 18px; }
