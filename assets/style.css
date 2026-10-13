@@ -197,6 +197,8 @@ kbd{
 .bullet:hover      > .addbar, .bullet.is-active   > .addbar,
 .row3:hover        > .addbar, .row3.is-active     > .addbar,
 .idline:hover      > .addbar, .idline.is-active   > .addbar,
+.skill:hover       > .addbar, .skill.is-active    > .addbar,
+.note:hover        > .addbar, .note.is-active     > .addbar,
 .nameline:hover    > .addbar, .nameline.is-active > .addbar{
   opacity:1; visibility:visible; transition:none;
 }

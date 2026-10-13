@@ -95,6 +95,11 @@ const edLink = (path, value, url) =>
             wrap: "split" 从这个字段起另起一行 / "merge" 把这一行并回上一行 } */
 function ctl(path, label, opts = {}) {
   let b = `<span class="ctl" contenteditable="false">`;
+  // 信息区字段的「＋标签」放这张浮卡里，不放左边 —— 行首字段的左边正好是那一行的「＋字段」，会被压住
+  if (opts.labAdd) {
+    b += `<button class="ctl-btn ctl-add" data-set="${esc(path)}.label" data-val="标签" `
+       + `title="加回标签">＋标签</button>`;
+  }
   if (opts.wrap === "split") {
     b += `<button class="ctl-btn ctl-wrap" data-wrap="${esc(path)}" data-mode="split" `
        + `title="从这个字段起另起一行（编辑时直接按回车也一样）">↵</button>`;
@@ -162,6 +167,16 @@ function sectionAddsFor(s, p) {
     { path: `${p}.items`, kind: "entry", label: "＋一段经历", title: "在这个板块加一段经历" }];
 }
 
+/** 「标签：」—— 标签删空了就连冒号一起不画，否则纸上会剩一个删不掉的「：」。
+    要点、技能行、教育备注、顶部字段四处共用，别各写各的。 */
+function lab(p, label) {
+  return label ? `<span class="lab">${ed(p + ".label", label)}：</span>` : ``;
+}
+/** 标签删空之后，在「＋」里给一个请回来的入口 */
+function labAdd(p, label, title = "加回标签") {
+  return label ? [] : [{ set: p + ".label", val: "标签", label: "＋标签", title }];
+}
+
 /** 顶部信息区的一个字段：标签 + 值（值可能是链接） */
 function field(line, i, j, f) {
   const base = `basics.lines.${i}.${j}`;
@@ -173,8 +188,8 @@ function field(line, i, j, f) {
   // 「断行 + 并行」两个动作合起来，任何一种分行方式都拼得出来。
   const wrap = j > 0 ? "split" : (i > 0 ? "merge" : null);
   return `<span class="fld" data-row="${esc(base)}">`
-    + `<span class="lab">${ed(base + ".label", f.label)}：</span>${val}`
-    + ctl(base, "这个字段", { drag: true, url: base + ".url", wrap })
+    + lab(base, f.label) + val
+    + ctl(base, "这个字段", { drag: true, url: base + ".url", wrap, labAdd: !f.label })
     + `</span>`;
 }
 
@@ -208,16 +223,13 @@ function header(data) {
 const isPlain = (b) => b.plain === true;
 
 function bullet(b, p) {
-  let inner = "";
-  if (b.label) inner += `<span class="lab">${ed(p + ".label", b.label)}：</span>`;
+  let inner = lab(p, b.label);
   inner += b.url
     ? edLink(p + ".text", b.text ?? b.url, b.url)
     : ed(p + ".text", b.text);
 
   const plain = isPlain(b);
-  const adds = [];
-  if (!b.label) adds.push({ set: p + ".label", val: "标签", label: "＋标签",
-                            title: "给这条要点加一个蓝色标签" });
+  const adds = labAdd(p, b.label, "给这条要点加一个蓝色标签");
   // 方块被去掉之后，在「＋」里给一个请回来的入口 —— 和板块的「＋图标」同一套路数
   if (plain) adds.push({ plainOff: p, label: "＋方块",
                          title: "把前面的方块加回来，变回一条要点" });
@@ -266,17 +278,17 @@ function section(s, i) {
     (s.notes || []).forEach((n, j) => {
       const q = `${p}.notes.${j}`;
       h += `<div class="note" data-row="${q}">`
-        + `<span class="lab">${ed(q + ".label", n.label)}：</span>`
-        + ed(q + ".value", n.value) + ctl(q, "这一行", { drag: true }) + `</div>`;
+        + lab(q, n.label) + ed(q + ".value", n.value)
+        + addbar(labAdd(q, n.label)) + ctl(q, "这一行", { drag: true }) + `</div>`;
     });
 
   } else if (s.type === "skills") {
     (s.lines || []).forEach((l, j) => {
       const q = `${p}.lines.${j}`;
       h += `<div class="skill" data-row="${q}">`
-        + `<span class="lab">${ed(q + ".label", l.label)}：</span>`
+        + lab(q, l.label)
         + `<span class="val">${ed(q + ".value", l.value)}</span>`
-        + ctl(q, "这一行", { drag: true }) + `</div>`;
+        + addbar(labAdd(q, l.label)) + ctl(q, "这一行", { drag: true }) + `</div>`;
     });
 
   } else if (s.type === "campus") {
