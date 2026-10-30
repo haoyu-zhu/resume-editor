@@ -394,17 +394,28 @@ function moveItem(path, dir) {
     信息区字段跨行搬家 —— 这两种最常用，而且不会把数据搬到错误的形状里。 */
 function famOf(arrPath) {
   if (arrPath === "sections") return "section";
+  // 教育备注可以在同一板块的各所学校之间搬家
+  const note = /^(sections\.\d+)(\.items\.\d+)?\.notes$/.exec(arrPath);
+  if (note) return note[1] + ":note";
   if (arrPath === "basics.lines") return "idline";
   if (/^basics\.lines\.\d+$/.test(arrPath)) return "field";
   if (/\.bullets$/.test(arrPath)) return "bullet";
   return arrPath;   // 某个板块自己的 items / lines / notes，只能在板块内部动
 }
 
+/** 拖备注时，学校那一行本身也是落点：放上去 = 挂到这所学校备注的最前面。
+    没有它的话，一条备注都没有的学校永远接不住备注。 */
+function isEduDrop(row, fam) {
+  return fam.endsWith(":note") && row.classList.contains("edu")
+    && row.dataset.row.startsWith(fam.slice(0, -5) + ".items.");
+}
+
 /** 从鼠标落点往上找第一个「和拖动来源同族」的行 */
 function dropTargetFrom(el, fam) {
   let n = el;
   while (n && n.id !== "doc") {
-    if (n.dataset && n.dataset.row && famOf(splitPath(n.dataset.row).arrPath) === fam) return n;
+    if (n.dataset && n.dataset.row &&
+        (famOf(splitPath(n.dataset.row).arrPath) === fam || isEduDrop(n, fam))) return n;
     n = n.parentElement;
   }
   return null;
@@ -417,6 +428,19 @@ function clearDropMarks() {
 
 /** 把 fromPath 那一项搬到 toPath 前面或后面 */
 function dropMove(fromPath, toPath, after) {
+  // 备注落在学校行上：换算成「这所学校第 0 条备注的前面」
+  const school = pathGet(state.data, toPath);
+  if (/\.notes\.\d+$/.test(fromPath) && /\.items\.\d+$/.test(toPath) && school) {
+    if (!Array.isArray(school.notes)) school.notes = [];
+    if (!school.notes.length) {            // 空列表没有「第 0 条」可对准，直接放进去
+      const src = splitPath(fromPath);
+      snapshot();
+      school.notes.push(src.arr.splice(src.idx, 1)[0]);
+      paint();
+      return;
+    }
+    toPath = toPath + ".notes.0"; after = false;
+  }
   const from = splitPath(fromPath), to = splitPath(toPath);
   if (!Array.isArray(from.arr) || !Array.isArray(to.arr)) return;
   if (fromPath === toPath) return;
@@ -554,6 +578,7 @@ function pageUnits(doc) {
   /** 一行拆成几个不可拆块。一段经历如果本身就比一页还高，
       整块硬绑只会在页底留下大片空白，这时退一步，允许它在要点之间断开。 */
   const rowUnits = (r) => {
+    if (r.top) return [r];                    // 已经并好的跨度（学校 + 它的备注）
     const bullets = Array.from(r.querySelectorAll(":scope > .bullet"));
     if (bullets.length && r.offsetHeight > usable) {
       return [{ top: r, end: bullets[0] },
@@ -567,8 +592,17 @@ function pageUnits(doc) {
   if (header) units.push({ top: header, end: header });
 
   doc.querySelectorAll(".sec").forEach(sec => {
-    const rows = Array.from(sec.children)
+    let rows = Array.from(sec.children)
       .filter(c => c.matches(".entry, .row3, .skill, .note"));
+    // 学校和挂在它下面的备注是一块，不能学校留在页底、备注掉到下一页。
+    // 借用 rowUnits 的形状：并成一个 {top, end} 跨度，后面统一当一块推
+    const spans = [];
+    rows.forEach(r => {
+      const prev = spans[spans.length - 1];
+      if (r.matches(".note") && prev && prev.top.matches(".row3.edu")) prev.end = r;
+      else spans.push({ top: r, end: r });
+    });
+    rows = spans.map(s => s.top === s.end ? s.top : s);
     if (!rows.length) { units.push({ top: sec, end: sec }); return; }
     // 板块标题 + 横线 + 第一块绑在一起：标题绝不能单独留在页底。
     // 注意第一行也要先过 rowUnits —— 否则一段超高的经历正好是板块第一段时，
@@ -737,8 +771,24 @@ function normalizePhoto(obj) {
   }
 }
 
+/** 教育板块的备注原来是板块级的一个列表，永远排在所有学校后面 ——
+    学校就没法挪到备注下面，本科、硕士也没法各自挂课程和奖项。
+    现在备注挂在每所学校自己身上（items[j].notes）。老数据的板块级备注
+    并到最后一所学校名下：它们本来就画在最后一所学校的正下方，迁完版面一个像素都不动。 */
+function normalizeEdu(obj) {
+  (obj.sections || []).forEach(s => {
+    if (s.type !== "education" || !Array.isArray(s.notes)) return;
+    const items = s.items || [];
+    if (!items.length) return;                 // 一所学校都没有，只能留在板块上
+    const last = items[items.length - 1];
+    last.notes = (last.notes || []).concat(s.notes);
+    delete s.notes;
+  });
+}
+
 function loadData(obj, { keepVars = false, transient = false, source = "" } = {}) {
   normalizePhoto(obj);
+  normalizeEdu(obj);
   state.transient = transient;
   state.unsaved = false;
   state.data = obj;
@@ -1156,8 +1206,10 @@ function bind() {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     const r = tgt.getBoundingClientRect();
-    // 信息区的字段是横着排的，看左右；其它都是整行，看上下
-    const after = tgt.classList.contains("fld")
+    // 信息区的字段是横着排的，看左右；其它都是整行，看上下。
+    // 备注落到学校行上一律是「挂到它下面」，标记画在下沿
+    const after = isEduDrop(tgt, state.drag.fam) ? true
+      : tgt.classList.contains("fld")
       ? e.clientX > r.left + r.width / 2
       : e.clientY > r.top + r.height / 2;
     tgt.classList.add(after ? "drop-after" : "drop-before");

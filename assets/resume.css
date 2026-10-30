@@ -135,6 +135,9 @@
 .skill .val{ flex:1 1 auto; min-width:0; text-align:justify; }
 .note{ margin-top:1pt; }
 .note .lab{ font-weight:700; }
+/* 上一所学校挂了备注，下一所学校要隔开一点，不然分不清备注归谁。
+   学校之间没有备注时不受影响（老简历备注全在最后一所下面，版面一点不变） */
+.note + .row3.edu{ margin-top:calc(var(--entry-gap) / 2 + 1.5pt); }
 
 /* ---------- 划字上色（JSON 里的 [[wine|一段字]]）----------
    写死的五个色值，和五套主题的主色同源，但**不跟着主题变**（见 render.js）。
@@ -169,6 +172,8 @@
   .sec-title, .sec-rule{ break-after:avoid; page-break-after:avoid; }
   .sec-title{ break-inside:avoid; page-break-inside:avoid; }
   .entry-head{ break-after:avoid; page-break-after:avoid; }
+  /* 学校和它下面的备注不拆开 —— 和屏幕分页 pageUnits 里的「学校 + 备注」并块对齐 */
+  .row3.edu:has(+ .note), .note:has(+ .note){ break-after:avoid; page-break-after:avoid; }
   .entry, .bullet, .row3, .skill, .note, .idline, .header{
     break-inside:avoid; page-break-inside:avoid;
   }

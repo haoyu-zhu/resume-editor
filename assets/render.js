@@ -156,9 +156,15 @@ function sectionAdds(s, p) {
 }
 
 function sectionAddsFor(s, p) {
-  if (s.type === "education") return [
-    { path: `${p}.items`, kind: "eduItem",   label: "＋学校", title: "加一行教育经历" },
-    { path: `${p}.notes`, kind: "note",      label: "＋备注", title: "加一条备注（GPA、获奖等）" }];
+  // 标题行的「＋备注」加给最后一所学校 —— 和老版本「备注排在最后」的位置一样；
+  // 想挂到别的学校下面，用那所学校那一行左边的「＋备注」
+  if (s.type === "education") {
+    const n = (s.items || []).length;
+    return [
+      { path: `${p}.items`, kind: "eduItem", label: "＋学校", title: "加一行教育经历" },
+      { path: n ? `${p}.items.${n - 1}.notes` : `${p}.notes`, kind: "note",
+        label: "＋备注", title: "加一条备注（GPA、获奖等）" }];
+  }
   if (s.type === "skills") return [
     { path: `${p}.lines`, kind: "skillLine", label: "＋一行", title: "在这个板块加一行" }];
   if (s.type === "campus") return [
@@ -241,6 +247,16 @@ function bullet(b, p) {
           { drag: true, url: p + ".url", plainOn: !plain }) + `</div>`;
 }
 
+/** 教育板块的备注行。挂在哪所学校下面，就紧跟着那所学校画 */
+function eduNotes(notes, arrPath) {
+  return (notes || []).map((n, j) => {
+    const q = `${arrPath}.${j}`;
+    return `<div class="note" data-row="${q}">`
+      + lab(q, n.label) + ed(q + ".value", n.value)
+      + addbar(labAdd(q, n.label)) + ctl(q, "这一行", { drag: true }) + `</div>`;
+  }).join("");
+}
+
 function section(s, i) {
   const p = `sections.${i}`;
   // 图标 + 标题 + 「＋」包成 .sec-head：它的宽度贴着内容，
@@ -260,7 +276,8 @@ function section(s, i) {
   if (s.type === "education") {
     (s.items || []).forEach((it, j) => {
       const q = `${p}.items.${j}`;
-      const opt = [];
+      const opt = [{ path: q + ".notes", kind: "note", label: "＋备注",
+                     title: "在这所学校下面加一条备注（课程、奖项、GPA）" }];
       if (!it.tag)    opt.push({ set: q + ".tag",    val: "985",  label: "＋标记",
                                  title: "加院校标记（985 / 211 / QS 排名）" });
       if (!it.degree) opt.push({ set: q + ".degree", val: "本科", label: "＋学位",
@@ -274,13 +291,11 @@ function section(s, i) {
         + `</span>`
         + `<span class="r gray small">${ed(q + ".date", it.date)}</span>`
         + addbar(opt) + ctl(q, "这一行", { drag: true }) + `</div>`;
+      h += eduNotes(it.notes, q + ".notes");
     });
-    (s.notes || []).forEach((n, j) => {
-      const q = `${p}.notes.${j}`;
-      h += `<div class="note" data-row="${q}">`
-        + lab(q, n.label) + ed(q + ".value", n.value)
-        + addbar(labAdd(q, n.label)) + ctl(q, "这一行", { drag: true }) + `</div>`;
-    });
+    // 板块级的备注是老格式，打开时已经迁到最后一所学校下面（app.js 的 normalizeEdu）；
+    // 只有一所学校都没有时才会留在这里
+    h += eduNotes(s.notes, p + ".notes");
 
   } else if (s.type === "skills") {
     (s.lines || []).forEach((l, j) => {
